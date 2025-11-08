@@ -4,7 +4,6 @@
         Title="FocusPuller" Height="400" Width="500"
         ResizeMode="CanMinimize"
         Icon="pack://application:,,,/focuspuller.ico"
-        Topmost="True"
         Closing="Window_Closing"
         StateChanged="Window_StateChanged">
     <Window.Resources>

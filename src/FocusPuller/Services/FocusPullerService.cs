@@ -83,14 +83,28 @@ public class FocusPullerService
 
                 if (timeSinceFocusLost >= _refocusDelayMs && idleTime >= _refocusDelayMs)
                 {
-                    // If app window is visible (not minimized to tray), simulate click in middle of its window
-                    IntPtr appHandle = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
-                    if (appHandle != IntPtr.Zero && _windowMonitor.GetForegroundWindow() != appHandle)
+                    try
                     {
-                        if (NativeMethods.GetWindowRect(appHandle, out var appRect))
+                        // Restore target window (in case minimized)
+                        NativeMethods.ShowWindow(_targetWindowHandle, NativeMethods.SW_RESTORE);
+
+                        // Determine whether the window is already topmost
+                        var exStylePtr = NativeMethods.GetWindowLongPtr(_targetWindowHandle, NativeMethods.GWL_EXSTYLE);
+                        bool wasTopMost = (exStylePtr.ToInt64() & NativeMethods.WS_EX_TOPMOST) != 0;
+
+                        // If not topmost, temporarily set it topmost so a click will bring it to foreground
+                        bool madeTopMost = false;
+                        if (!wasTopMost)
                         {
-                            int centerX = appRect.Left + appRect.Width / 2;
-                            int centerY = appRect.Top + appRect.Height / 2;
+                            madeTopMost = NativeMethods.SetWindowPos(_targetWindowHandle, NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
+                                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
+                        }
+
+                        // Simulate a click in the center of the target window
+                        if (NativeMethods.GetWindowRect(_targetWindowHandle, out var rect))
+                        {
+                            int centerX = rect.Left + rect.Width / 2;
+                            int centerY = rect.Top + rect.Height / 2;
 
                             // Save current cursor position
                             NativeMethods.GetCursorPos(out var originalPos);
@@ -104,15 +118,24 @@ public class FocusPullerService
                             NativeMethods.SetCursorPos(originalPos.X, originalPos.Y);
                         }
 
-                        // Give this process permission to set foreground
+                        // If we made it topmost earlier, unset topmost
+                        if (!wasTopMost && madeTopMost)
+                        {
+                            NativeMethods.SetWindowPos(_targetWindowHandle, NativeMethods.HWND_NOTOPMOST, 0, 0, 0, 0,
+                                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
+                        }
+
+                        // Give this process permission to set foreground and then set foreground
                         var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
                         NativeMethods.AllowSetForegroundWindow(new IntPtr(pid));
+                        _windowMonitor.SetForegroundWindow(_targetWindowHandle);
+
+                        _focusLost = false;
                     }
-
-                    // Refocus the target window
-                    _windowMonitor.SetForegroundWindow(_targetWindowHandle);
-
-                    _focusLost = false;
+                    catch
+                    {
+                        // Swallow exceptions to avoid crashing timer thread
+                    }
                 }
             }
         }
