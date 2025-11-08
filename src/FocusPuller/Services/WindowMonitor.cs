@@ -47,10 +47,21 @@ public class WindowMonitor
         if (!NativeMethods.IsWindow(hWnd))
             return false;
 
-        // Restore window if minimized
-        NativeMethods.ShowWindow(hWnd, NativeMethods.SW_RESTORE);
-        
-        return NativeMethods.SetForegroundWindow(hWnd);
+        // Only set foreground if not already focused
+        if (NativeMethods.GetForegroundWindow() == hWnd)
+            return true;
+
+        // Focus window
+        //NativeMethods.ShowWindow(hWnd, NativeMethods.SW_SHOW);
+        bool focused = NativeMethods.SetForegroundWindow(hWnd);
+
+        // set the cursor position to the center of the window
+        NativeMethods.GetWindowRect(hWnd, out var rect);
+        int centerX = (rect.Left + rect.Right) / 2;
+        int centerY = (rect.Top + rect.Bottom) / 2;
+        NativeMethods.SetCursorPos(centerX, centerY);
+
+        return focused;
     }
 
     public uint GetIdleTimeMs()

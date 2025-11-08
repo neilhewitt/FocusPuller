@@ -571,15 +571,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Window_Closing(object sender, CancelEventArgs e)
+    public void RestoreFromTray()
     {
-        // Stop the window check timer
-        _windowCheckTimer?.Stop();
-        
-        // Actually close the application
-        _focusPullerService.Stop();
-        SaveSettings();
-        Application.Current.Shutdown();
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
     }
 
     private void FocusPullerService_TargetWindowClosed(object sender, EventArgs e)
@@ -592,10 +588,12 @@ public partial class MainWindow : Window
         });
     }
 
-    public void RestoreFromTray()
+    private void Window_Closing(object sender, CancelEventArgs e)
     {
-        Show();
-        WindowState = WindowState.Normal;
-        Activate();
+        // Stop background timers and services
+        _windowCheckTimer?.Stop();
+        _focusPullerService.Stop();
+        SaveSettings();
+        // Do not call Application.Current.Shutdown() here because Closing is triggered by application shutdown already
     }
 }

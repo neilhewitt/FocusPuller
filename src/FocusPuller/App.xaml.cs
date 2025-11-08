@@ -5,6 +5,10 @@ using System.Windows;
 using System.Windows.Input;
 using Hardcodet.Wpf.TaskbarNotification;
 using FocusPuller.Services;
+using System.IO;
+using System.Reflection;
+using System.Diagnostics;
+using FocusPuller.Interop;
 
 namespace FocusPuller;
 
@@ -21,10 +25,21 @@ public partial class App : Application
         base.OnStartup(e);
 
         // Initialize tray icon
-        _trayIcon = (TaskbarIcon)FindResource("TrayIcon");
+        _trayIcon = new TaskbarIcon();
+        _trayIcon.TrayMouseDoubleClick += TrayIcon_TrayMouseDoubleClick;    
         
-        // Create a simple icon programmatically
-        _trayIcon.Icon = CreateTrayIcon();
+        // Set tooltip for tray icon
+        _trayIcon.ToolTipText = "FocusPuller";
+
+        // Set tray icon from focuspuller.ico resource
+        var iconUri = new Uri("pack://application:,,,/focuspuller.ico", UriKind.Absolute);
+        using (var stream = Application.GetResourceStream(iconUri)?.Stream)
+        {
+            if (stream != null)
+            {
+                _trayIcon.Icon = new Icon(stream);
+            }
+        }
 
         // Load settings to check hide mode
         var settingsManager = new SettingsManager();
@@ -35,44 +50,18 @@ public partial class App : Application
 
         if (settings.IsHideMode)
         {
-            // Start minimized to tray with refocusing on
-            // Don't show the window
+            // Show the window initially, then minimize to tray
+            _mainWindow.Show();
+
+            // Minimize after layout so user briefly sees UI before it goes to tray
+            _mainWindow.Dispatcher.BeginInvoke(new Action(() => {
+                _mainWindow.WindowState = WindowState.Minimized;
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
         else
         {
             // Start normally - show window, refocusing off
             _mainWindow.Show();
-        }
-    }
-
-    private Icon CreateTrayIcon()
-    {
-        // Create a simple icon with a colored circle
-        const int size = 16;
-        using (Bitmap bitmap = new Bitmap(size, size))
-        using (Graphics g = Graphics.FromImage(bitmap))
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            
-            // Fill with transparent background
-            g.Clear(Color.Transparent);
-            
-            // Draw a blue circle
-            using (SolidBrush brush = new SolidBrush(Color.FromArgb(0, 120, 215))) // Windows blue
-            {
-                g.FillEllipse(brush, 2, 2, size - 4, size - 4);
-            }
-            
-            // Draw white border
-            using (Pen pen = new Pen(Color.White, 1.5f))
-            {
-                g.DrawEllipse(pen, 2, 2, size - 4, size - 4);
-            }
-            
-            // Convert bitmap to icon
-            IntPtr hIcon = bitmap.GetHicon();
-            Icon icon = Icon.FromHandle(hIcon);
-            return icon;
         }
     }
 

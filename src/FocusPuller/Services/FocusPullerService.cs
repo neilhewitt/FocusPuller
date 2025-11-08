@@ -1,5 +1,8 @@
 using System.Windows.Threading;
 using FocusPuller.Models;
+using FocusPuller.Interop;
+using System.Runtime.InteropServices;
+using System.Drawing;
 
 namespace FocusPuller.Services;
 
@@ -80,8 +83,35 @@ public class FocusPullerService
 
                 if (timeSinceFocusLost >= _refocusDelayMs && idleTime >= _refocusDelayMs)
                 {
+                    // If app window is visible (not minimized to tray), simulate click in middle of its window
+                    IntPtr appHandle = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+                    if (appHandle != IntPtr.Zero && _windowMonitor.GetForegroundWindow() != appHandle)
+                    {
+                        if (NativeMethods.GetWindowRect(appHandle, out var appRect))
+                        {
+                            int centerX = appRect.Left + appRect.Width / 2;
+                            int centerY = appRect.Top + appRect.Height / 2;
+
+                            // Save current cursor position
+                            NativeMethods.GetCursorPos(out var originalPos);
+
+                            // Move cursor and click
+                            NativeMethods.SetCursorPos(centerX, centerY);
+                            NativeMethods.mouse_event(NativeMethods.MOUSEEVENTF_LEFTDOWN, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
+                            NativeMethods.mouse_event(NativeMethods.MOUSEEVENTF_LEFTUP, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
+
+                            // Restore cursor
+                            NativeMethods.SetCursorPos(originalPos.X, originalPos.Y);
+                        }
+
+                        // Give this process permission to set foreground
+                        var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                        NativeMethods.AllowSetForegroundWindow(new IntPtr(pid));
+                    }
+
                     // Refocus the target window
                     _windowMonitor.SetForegroundWindow(_targetWindowHandle);
+
                     _focusLost = false;
                 }
             }
