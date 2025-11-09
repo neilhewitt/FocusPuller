@@ -77,6 +77,9 @@ public partial class MainWindow : Window
             // Otherwise we're in waiting mode (refocusing is on, waiting for window to appear)
         }
 
+        // Refresh the window list to apply AllowOnlyRuleDefinedWindows setting
+        RefreshWindowList();
+
         UpdateRefocusingButton();
     }
 
@@ -188,7 +191,13 @@ public partial class MainWindow : Window
             WindowComboBox.Items.Add(placeholderWindow);
         }
 
-        // Add all visible windows
+        // If settings require only rule-defined windows, filter the list
+        if (_settings != null && _settings.AllowOnlyRuleDefinedWindows)
+        {
+            windows = windows.Where(w => _windowMatchingService.FindMatchingRule(w.ClassName, w.Title) != null).ToList();
+        }
+
+        // Add all visible windows (or filtered set)
         foreach (var window in windows)
         {
             WindowComboBox.Items.Add(window);

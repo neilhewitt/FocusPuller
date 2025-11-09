@@ -50,7 +50,8 @@ public class WindowMatchingService
         _rules.Add(new WindowMatchingRule(
             "AceApp",
             "Microsoft Flight Simulator 2024 -",
-            "Microsoft Flight Simulator 2020 -"
+            "Microsoft Flight Simulator 2020 -",
+            "Microsoft Flight Simulator -"
         ));
 
         // Add more default rules here as needed

@@ -52,6 +52,40 @@ public class FocusPullerService
         _focusLost = false;
     }
 
+    private int GetTitleBarClickY(Interop.NativeMethods.RECT rect, IntPtr hWnd)
+    {
+        // Default fallback: click 1/12th down from top or at least 8px
+        int fallback = rect.Top + Math.Max(8, rect.Height / 12);
+
+        try
+        {
+            // Determine if window style includes a caption/title bar
+            var stylePtr = NativeMethods.GetWindowLongPtr(hWnd, NativeMethods.GWL_STYLE);
+            bool hasCaption = (stylePtr.ToInt64() & NativeMethods.WS_CAPTION) != 0;
+
+            int captionHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYCAPTION);
+            int frameHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYFRAME);
+
+            if (hasCaption)
+            {
+                // Titlebar height includes caption + frame
+                int titleBarHeight = captionHeight + frameHeight;
+                // Click halfway through the title bar area
+                return rect.Top + titleBarHeight / 2;
+            }
+            else
+            {
+                // No caption - click near the top edge within a small area
+                int topArea = Math.Max(8, Math.Min(rect.Height / 12, 48));
+                return rect.Top + topArea / 2;
+            }
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
     private void Timer_Tick(object sender, EventArgs e)
     {
         if (!_isEnabled || _targetWindowHandle == IntPtr.Zero)
@@ -100,11 +134,11 @@ public class FocusPullerService
                                 NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
                         }
 
-                        // Simulate a click in the center of the target window
+                        // Simulate a click in the horizontal center of the target window's title bar / top area
                         if (NativeMethods.GetWindowRect(_targetWindowHandle, out var rect))
                         {
                             int centerX = rect.Left + rect.Width / 2;
-                            int centerY = rect.Top + rect.Height / 2;
+                            int centerY = GetTitleBarClickY(rect, _targetWindowHandle);
 
                             // Save current cursor position
                             NativeMethods.GetCursorPos(out var originalPos);

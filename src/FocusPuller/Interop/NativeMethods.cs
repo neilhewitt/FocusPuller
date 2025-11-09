@@ -119,4 +119,14 @@ public static class NativeMethods
             return GetWindowLongPtr64(hWnd, nIndex);
         return new IntPtr(GetWindowLong32(hWnd, nIndex));
     }
+
+    // Added for title bar height calculations
+    public const int GWL_STYLE = -16;
+    public const int WS_CAPTION = 0x00C00000; // WS_BORDER | WS_DLGFRAME typically
+
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetrics(int nIndex);
+
+    public const int SM_CYCAPTION = 4;
+    public const int SM_CYFRAME = 33;
 }

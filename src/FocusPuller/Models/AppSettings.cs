@@ -6,6 +6,7 @@ public class AppSettings
     public bool IsHideMode { get; set; } = false;
     public string TargetWindowTitle { get; set; } = "";
     public string TargetWindowClassName { get; set; } = "";
+    public bool AllowOnlyRuleDefinedWindows { get; set; } = true;
     public List<WindowMatchingRuleData> MatchingRules { get; set; } = new List<WindowMatchingRuleData>();
 }
 
