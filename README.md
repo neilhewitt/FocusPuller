@@ -16,10 +16,7 @@ The default rule set is configured to target Flight Simulator, but you can chang
 
 ## Window targeting rules
 
-The default rules are stored in
-```
-%APPDATA%\FocusPuller\defaultrules.json
-```
+The default rules are stored in 'defaultrules.json' which will be found alongside the executable.
 
 If you want to customize the rules, edit the file before first run. After first run, the rules are saved to the `settings.json` file and you can change them again there if you need to.
 
