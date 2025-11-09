@@ -20,4 +20,10 @@
     <Resource Include="FocusPuller.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="defaultrules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

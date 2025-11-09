@@ -33,8 +33,29 @@ public class SettingsManager
             System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
         }
 
-        // No settings file exists, create default settings and save them
+        // No settings file exists - initialize default settings
         var defaultSettings = new AppSettings();
+
+        try
+        {
+            // Look for defaultrules.json next to the application executable
+            var appBase = AppContext.BaseDirectory;
+            var defaultRulesPath = Path.Combine(appBase, "defaultrules.json");
+            if (File.Exists(defaultRulesPath))
+            {
+                var rulesJson = File.ReadAllText(defaultRulesPath);
+                var rulesData = JsonSerializer.Deserialize<List<WindowMatchingRuleData>>(rulesJson);
+                if (rulesData != null && rulesData.Count > 0)
+                {
+                    defaultSettings.MatchingRules = rulesData;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to load default rules: {ex.Message}");
+        }
+
         SaveSettings(defaultSettings);
         return defaultSettings;
     }

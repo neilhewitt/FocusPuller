@@ -68,10 +68,11 @@ public class WindowMonitor
     {
         var lastInputInfo = new NativeMethods.LASTINPUTINFO();
         lastInputInfo.cbSize = (uint)Marshal.SizeOf(lastInputInfo);
-        
-        if (NativeMethods.GetLastInputInfo(ref lastInputInfo) != IntPtr.Zero)
+
+        if (NativeMethods.GetLastInputInfo(ref lastInputInfo))
         {
-            return NativeMethods.GetTickCount() - lastInputInfo.dwTime;
+            uint tick = NativeMethods.GetTickCount();
+            return tick - lastInputInfo.dwTime;
         }
 
         return 0;

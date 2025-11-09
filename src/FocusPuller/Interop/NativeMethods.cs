@@ -43,8 +43,10 @@ public static class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetLastInputInfo(ref LASTINPUTINFO plii);
+    // Corrected signature for GetLastInputInfo
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
     [DllImport("kernel32.dll")]
     public static extern uint GetTickCount();

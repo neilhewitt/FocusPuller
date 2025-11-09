@@ -1,4 +1,7 @@
 using FocusPuller.Models;
+using System.Text.Json;
+using System.IO;
+using System.Linq;
 
 namespace FocusPuller.Services;
 
@@ -46,21 +49,36 @@ public class WindowMatchingService
 
     private void InitializeDefaultRules()
     {
-        // Microsoft Flight Simulator rule
+        try
+        {
+            var appBase = AppContext.BaseDirectory;
+            var defaultRulesPath = Path.Combine(appBase, "defaultrules.json");
+            if (File.Exists(defaultRulesPath))
+            {
+                var json = File.ReadAllText(defaultRulesPath);
+                var rulesData = JsonSerializer.Deserialize<List<WindowMatchingRuleData>>(json);
+                if (rulesData != null)
+                {
+                    foreach (var rd in rulesData)
+                    {
+                        _rules.Add(WindowMatchingRule.FromData(rd));
+                    }
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // ignore and fall back to hardcoded defaults
+        }
+
+        // Hardcoded fallback
         _rules.Add(new WindowMatchingRule(
             "AceApp",
             "Microsoft Flight Simulator 2024 -",
             "Microsoft Flight Simulator 2020 -",
             "Microsoft Flight Simulator -"
         ));
-
-        // Add more default rules here as needed
-        // Example:
-        // _rules.Add(new WindowMatchingRule(
-        //     "SomeClassName",
-        //     "Game Title -",
-        //     "Another Game -"
-        // ));
     }
 
     /// <summary>

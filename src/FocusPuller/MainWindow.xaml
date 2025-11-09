@@ -65,9 +65,9 @@
                     </ComboBox>
                     
                     <!-- Placeholder text overlay -->
-                    <TextBlock Text="Click to select target window"
+                    <TextBlock x:Name="PlaceholderText" Text="Click to select target window"
                                Foreground="Gray"
-                               Margin="8,5,0,0"
+                               Margin="8,0,0,0"
                                IsHitTestVisible="False"
                                VerticalAlignment="Center">
                         <TextBlock.Style>
@@ -85,15 +85,9 @@
                 
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    
-                    <Button x:Name="RefreshWindowsButton" 
-                            Grid.Column="0"
-                            Content="Refresh Window List" 
-                            Click="RefreshWindowsButton_Click"
-                            HorizontalAlignment="Left"/>
                     
                     <TextBlock x:Name="WindowStatusLabel"
                                Grid.Column="1"

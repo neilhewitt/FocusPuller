@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private WindowInfo _selectedWindow;
     private bool _isRefocusing = false;
     private System.Windows.Threading.DispatcherTimer _windowCheckTimer;
+    private System.Windows.Threading.DispatcherTimer _windowListRefreshTimer;
 
     public MainWindow()
     {
@@ -35,8 +36,20 @@ public partial class MainWindow : Window
         _windowCheckTimer.Tick += WindowCheckTimer_Tick;
         _windowCheckTimer.Start();
 
+        // Set up timer to refresh window list periodically (every 3 seconds)
+        _windowListRefreshTimer = new System.Windows.Threading.DispatcherTimer();
+        _windowListRefreshTimer.Interval = TimeSpan.FromSeconds(3);
+        _windowListRefreshTimer.Tick += WindowListRefreshTimer_Tick;
+        _windowListRefreshTimer.Start();
+
         RefreshWindowList();
         LoadSettings();
+    }
+
+    private void WindowListRefreshTimer_Tick(object sender, EventArgs e)
+    {
+        RefreshWindowList();
+        UpdateWindowStatus();
     }
 
     private void LoadSettings()
@@ -46,12 +59,12 @@ public partial class MainWindow : Window
         // Load matching rules into the service
         _windowMatchingService.LoadRules(_settings.MatchingRules);
 
-        // If no rules were loaded (first run), save the default rules
-        if (_settings.MatchingRules == null || _settings.MatchingRules.Count == 0)
-        {
-            _settings.MatchingRules = _windowMatchingService.GetRulesData();
-            _settingsManager.SaveSettings(_settings);
-        }
+        //// If no rules were loaded (first run), save the default rules
+        //if (_settings.MatchingRules == null || _settings.MatchingRules.Count == 0)
+        //{
+        //    _settings.MatchingRules = _windowMatchingService.GetRulesData();
+        //    _settingsManager.SaveSettings(_settings);
+        //}
 
         DelaySlider.Value = _settings.RefocusDelayMs;
         HideModeCheckBox.IsChecked = _settings.IsHideMode;
@@ -59,6 +72,74 @@ public partial class MainWindow : Window
         // Set refocusing state based on Hide Mode
         // If Hide Mode is on, start with refocusing enabled; otherwise start with it off
         _isRefocusing = _settings.IsHideMode;
+
+        bool found = !string.IsNullOrWhiteSpace(_settings.TargetWindowTitle);
+        // If no target defined and the user only allows rule-defined windows, try to auto-select
+        //if (string.IsNullOrEmpty(_settings.TargetWindowTitle) && _settings.AllowOnlyRuleDefinedWindows)
+        //{
+        //    var visibleWindows = _windowMonitor.GetVisibleWindows();
+        //    var rulesData = _windowMatchingService.GetRulesData();
+        //    bool found = false;
+
+        //    if (rulesData != null)
+        //    {
+        //        foreach (var ruleData in rulesData)
+        //        {
+        //            if (ruleData?.TitlePrefixes == null)
+        //                continue;
+
+        //            foreach (var prefix in ruleData.TitlePrefixes)
+        //            {
+        //                if (string.IsNullOrEmpty(prefix))
+        //                    continue;
+
+        //                var match = visibleWindows.FirstOrDefault(w =>
+        //                    string.Equals(w.ClassName, ruleData.ClassName, StringComparison.Ordinal) &&
+        //                    w.Title != null && w.Title.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+        //                if (match != null)
+        //                {
+        //                    // Set as selected target
+        //                    _selectedWindow = match;
+
+        //                    // Persist the partial title (prefix) in settings rather than full title
+        //                    _settings.TargetWindowTitle = prefix;
+        //                    _settings.TargetWindowClassName = match.ClassName;
+
+        //                    // Try to select the corresponding item in the combo box if present
+        //                    foreach (WindowInfo item in WindowComboBox.Items)
+        //                    {
+        //                        if (item.Handle == match.Handle)
+        //                        {
+        //                            WindowComboBox.SelectedItem = item;
+        //                            break;
+        //                        }
+        //                    }
+
+        //                    // Persist the auto-selection
+        //                    _settingsManager.SaveSettings(_settings);
+
+        //                    found = true;
+        //                    break;
+        //                }
+        //            }
+
+        //            if (found)
+        //                break;
+        //        }
+        //    }
+
+            if (!found)
+            {
+                // Indicate to the user that no rule-matching windows are available
+                PlaceholderText.Text = "No available target windows matching rules";
+            }
+            //else
+            //{
+            //    // Ensure refocus button reflects new selection
+            //    UpdateRefocusingButton();
+            //}
+        //}
 
         // Try to restore the previously selected window
         if (!string.IsNullOrEmpty(_settings.TargetWindowTitle))
@@ -72,7 +153,12 @@ public partial class MainWindow : Window
             // If window exists and service isn't running, start it
             if (_selectedWindow.Handle != IntPtr.Zero && _selectedWindow.Exists)
             {
-                _focusPullerService.Start(_selectedWindow.Handle, (int)DelaySlider.Value);
+                _focusPullerService.Start(_selectedWindow.Handle, (int)DelaySlider.Value, _selectedWindow.ClassName, _selectedWindow.Title);
+            }
+            else
+            {
+                // If handle is zero (placeholder) but hide mode is enabled, start service with class/title so it can watch for appearance
+                _focusPullerService.Start(_selectedWindow.Handle, (int)DelaySlider.Value, _selectedWindow.ClassName, _selectedWindow.Title);
             }
             // Otherwise we're in waiting mode (refocusing is on, waiting for window to appear)
         }
@@ -80,7 +166,7 @@ public partial class MainWindow : Window
         // Refresh the window list to apply AllowOnlyRuleDefinedWindows setting
         RefreshWindowList();
 
-        UpdateRefocusingButton();
+        //UpdateRefocusingButton();
     }
 
     private void SaveSettings()
@@ -93,8 +179,31 @@ public partial class MainWindow : Window
 
         if (_selectedWindow != null)
         {
-            _settings.TargetWindowTitle = _selectedWindow.Title;
-            _settings.TargetWindowClassName = _selectedWindow.ClassName;
+            // If the selected window matches a rule, save the rule prefix instead of the full title
+            var rule = _windowMatchingService.FindMatchingRule(_selectedWindow.ClassName, _selectedWindow.Title);
+            if (rule != null)
+            {
+                // Find the first prefix that matches the window title
+                var matchingPrefix = rule.TitlePrefixes.FirstOrDefault(p =>
+                    !string.IsNullOrEmpty(p) && _selectedWindow.Title != null && _selectedWindow.Title.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrEmpty(matchingPrefix))
+                {
+                    _settings.TargetWindowTitle = matchingPrefix;
+                }
+                else
+                {
+                    // Fallback to full title if no specific prefix matched for some reason
+                    _settings.TargetWindowTitle = _selectedWindow.Title;
+                }
+
+                _settings.TargetWindowClassName = _selectedWindow.ClassName;
+            }
+            else
+            {
+                _settings.TargetWindowTitle = _selectedWindow.Title;
+                _settings.TargetWindowClassName = _selectedWindow.ClassName;
+            }
         }
 
         _settingsManager.SaveSettings(_settings);
@@ -106,20 +215,12 @@ public partial class MainWindow : Window
         
         // Try to find exact match first, then use matching rules
         var targetWindow = windows.FirstOrDefault(w =>
-            w.Title == _settings.TargetWindowTitle &&
-            w.ClassName == _settings.TargetWindowClassName);
-
-        // If no exact match, try using matching rules
-        if (targetWindow == null)
-        {
-            targetWindow = windows.FirstOrDefault(w =>
                 _windowMatchingService.WindowsMatch(
                     _settings.TargetWindowClassName,
                     _settings.TargetWindowTitle,
                     w.ClassName,
                     w.Title
                 ));
-        }
 
         if (targetWindow != null)
         {
@@ -147,6 +248,8 @@ public partial class MainWindow : Window
             }
             
             // Note: Don't call StartRefocusing here - let LoadSettings handle it
+
+            UpdateRefocusingButton();
         }
         else if (!string.IsNullOrEmpty(_settings.TargetWindowTitle))
         {
@@ -164,6 +267,8 @@ public partial class MainWindow : Window
             WindowComboBox.SelectedItem = placeholderWindow;
             
             // Note: Don't call StartRefocusing here - let LoadSettings handle it
+
+            UpdateRefocusingButton();
         }
     }
 
@@ -197,10 +302,43 @@ public partial class MainWindow : Window
             windows = windows.Where(w => _windowMatchingService.FindMatchingRule(w.ClassName, w.Title) != null).ToList();
         }
 
-        // Add all visible windows (or filtered set)
+        // Add all visible windows (or filtered set). Also, if no target is set and a matching window appears, auto-select it.
         foreach (var window in windows)
         {
             WindowComboBox.Items.Add(window);
+
+            if (_selectedWindow == null && !string.IsNullOrEmpty(_settings?.TargetWindowClassName) && string.IsNullOrEmpty(_settings?.TargetWindowTitle))
+            {
+                // No saved title but class is set? skip
+            }
+
+            // If no target is selected at all, and rule-filtering is enabled, select the first window that matches a rule
+            if (_selectedWindow == null && _settings != null && _settings.AllowOnlyRuleDefinedWindows)
+            {
+                var rule = _windowMatchingService.FindMatchingRule(window.ClassName, window.Title);
+                if (rule != null)
+                {
+                    WindowComboBox.SelectedItem = window;
+                    _selectedWindow = window;
+
+                    // Save selection as prefix if rule matched
+                    var matchingPrefix = rule.TitlePrefixes.FirstOrDefault(p => !string.IsNullOrEmpty(p) && window.Title != null && window.Title.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrEmpty(matchingPrefix))
+                    {
+                        _settings.TargetWindowTitle = matchingPrefix;
+                        _settings.TargetWindowClassName = window.ClassName;
+                        _settingsManager.SaveSettings(_settings);
+                    }
+
+                    // If refocusing is enabled (hide mode), start the focus service immediately for this window
+                    if (_isRefocusing && _selectedWindow.Handle != IntPtr.Zero)
+                    {
+                        _focusPullerService.Start(_selectedWindow.Handle, (int)DelaySlider.Value, _selectedWindow.ClassName, _selectedWindow.Title);
+                    }
+
+                    break;
+                }
+            }
         }
 
         // Try to restore selection
@@ -218,6 +356,13 @@ public partial class MainWindow : Window
                 }
             }
         }
+
+        if (WindowComboBox.SelectedItem == null && WindowComboBox.Items.Count > 0)
+        {
+            PlaceholderText.Text = "Click to select target window";
+        }
+
+        UpdateRefocusingButton();
     }
 
     private void StartRefocusing()
@@ -264,6 +409,10 @@ public partial class MainWindow : Window
             RefocusingButton.Content = "Off";
             RefocusingButton.Background = new SolidColorBrush(Colors.Red);
         }
+
+        // Enable the refocus button only if a target window is selected.
+        // Additionally allow enabling when Hide Mode/refocusing is active so the user can turn it off even if the window doesn't currently exist.
+        RefocusingButton.IsEnabled = _selectedWindow != null && (_selectedWindow.Exists || _isRefocusing);
     }
 
     private void WindowComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -287,33 +436,20 @@ public partial class MainWindow : Window
 
         if (_selectedWindow != null && _isRefocusing)
         {
-            _focusPullerService.UpdateTargetWindow(_selectedWindow.Handle);
+            // If service is already running, restart it with new target info
+            if (_focusPullerService.IsRunning)
+            {
+                _focusPullerService.Stop();
+            }
+
+            _focusPullerService.Start(_selectedWindow.Handle, (int)DelaySlider.Value, _selectedWindow.ClassName, _selectedWindow.Title);
             SaveSettings();
         }
         
         // Update window status immediately when selection changes
         UpdateWindowStatus();
-    }
 
-    private async void RefreshWindowsButton_Click(object sender, RoutedEventArgs e)
-    {
-        // Disable the button while refreshing
-        RefreshWindowsButton.IsEnabled = false;
-        
-        try
-        {
-            RefreshWindowList();
-            
-            // Add 1 second delay
-            await Task.Delay(1000);
-            
-            UpdateWindowStatus();
-        }
-        finally
-        {
-            // Re-enable the button
-            RefreshWindowsButton.IsEnabled = true;
-        }
+        UpdateRefocusingButton();
     }
 
     private void WindowCheckTimer_Tick(object sender, EventArgs e)
@@ -327,6 +463,7 @@ public partial class MainWindow : Window
         if (_selectedWindow == null)
         {
             WindowStatusLabel.Text = "";
+            UpdateRefocusingButton();
             return;
         }
 
@@ -401,7 +538,7 @@ public partial class MainWindow : Window
                 // If refocusing is enabled and we just got a valid handle, start the service
                 if (_isRefocusing)
                 {
-                    _focusPullerService.Start(_selectedWindow.Handle, (int)DelaySlider.Value);
+                    _focusPullerService.Start(_selectedWindow.Handle, (int)DelaySlider.Value, _selectedWindow.ClassName, _selectedWindow.Title);
                 }
             }
             
@@ -456,6 +593,8 @@ public partial class MainWindow : Window
                 }
             }
         }
+
+        UpdateRefocusingButton();
     }
 
     private void DelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -601,6 +740,7 @@ public partial class MainWindow : Window
     {
         // Stop background timers and services
         _windowCheckTimer?.Stop();
+        _windowListRefreshTimer?.Stop();
         _focusPullerService.Stop();
         SaveSettings();
         // Do not call Application.Current.Shutdown() here because Closing is triggered by application shutdown already

@@ -11,6 +11,8 @@ public class FocusPullerService
     private readonly WindowMonitor _windowMonitor;
     private readonly DispatcherTimer _timer;
     private IntPtr _targetWindowHandle;
+    private string? _targetClassName;
+    private string? _targetTitlePrefix;
     private int _refocusDelayMs;
     private bool _isEnabled;
     private DateTime _lastFocusLostTime;
@@ -26,9 +28,14 @@ public class FocusPullerService
         _timer.Tick += Timer_Tick;
     }
 
-    public void Start(IntPtr targetWindowHandle, int refocusDelayMs)
+    public bool IsRunning => _isEnabled;
+    public IntPtr TargetHandle => _targetWindowHandle;
+
+    public void Start(IntPtr targetWindowHandle, int refocusDelayMs, string? targetClassName = null, string? targetTitlePrefix = null)
     {
         _targetWindowHandle = targetWindowHandle;
+        _targetClassName = targetClassName;
+        _targetTitlePrefix = targetTitlePrefix;
         _refocusDelayMs = refocusDelayMs;
         _isEnabled = true;
         _focusLost = false;
@@ -88,7 +95,24 @@ public class FocusPullerService
 
     private void Timer_Tick(object sender, EventArgs e)
     {
-        if (!_isEnabled || _targetWindowHandle == IntPtr.Zero)
+        if (!_isEnabled)
+            return;
+
+        // If we don't have a handle but have class/title info, try to find the window
+        if (_targetWindowHandle == IntPtr.Zero && !string.IsNullOrEmpty(_targetTitlePrefix))
+        {
+            var visible = _windowMonitor.GetVisibleWindows();
+            var match = visible.FirstOrDefault(w =>
+                !string.IsNullOrEmpty(_targetClassName) ? string.Equals(w.ClassName, _targetClassName, StringComparison.Ordinal) : true
+                && w.Title != null && w.Title.StartsWith(_targetTitlePrefix, StringComparison.OrdinalIgnoreCase));
+
+            if (match != null)
+            {
+                _targetWindowHandle = match.Handle;
+            }
+        }
+
+        if (_targetWindowHandle == IntPtr.Zero)
             return;
 
         // Check if target window still exists
