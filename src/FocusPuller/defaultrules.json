@@ -1,11 +1,5 @@
 [
   {
-    "ClassName": "Notepad",
-    "TitlePrefixes": [
-      ""
-    ]
-  },
-  {
     "ClassName": "AceApp",
     "TitlePrefixes": [
       "Microsoft Flight Simulator 2024 -",

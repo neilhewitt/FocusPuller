@@ -19,20 +19,25 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Initialize tray icon
-        _trayIcon = new TaskbarIcon();
-        _trayIcon.TrayMouseDoubleClick += TrayIcon_TrayMouseDoubleClick;    
-        
-        // Set tooltip for tray icon
-        _trayIcon.ToolTipText = "FocusPuller";
-
-        // Set tray icon from focuspuller.ico resource
-        var iconUri = new Uri("pack://application:,,,/focuspuller.ico", UriKind.Absolute);
-        using (var stream = Application.GetResourceStream(iconUri)?.Stream)
+        // Prefer the TaskbarIcon declared in App.xaml resources so its ContextMenu and handlers wired in XAML work
+        if (this.Resources.Contains("TrayIcon") && this.Resources["TrayIcon"] is TaskbarIcon resourceIcon)
         {
-            if (stream != null)
+            _trayIcon = resourceIcon;
+        }
+        else
+        {
+            // Fallback: create programmatically
+            _trayIcon = new TaskbarIcon();
+            _trayIcon.TrayMouseDoubleClick += TrayIcon_TrayMouseDoubleClick;
+            _trayIcon.ToolTipText = "FocusPuller";
+
+            var iconUri = new Uri("pack://application:,,,/focuspuller.ico", UriKind.Absolute);
+            using (var stream = Application.GetResourceStream(iconUri)?.Stream)
             {
-                _trayIcon.Icon = new Icon(stream);
+                if (stream != null)
+                {
+                    _trayIcon.Icon = new Icon(stream);
+                }
             }
         }
 

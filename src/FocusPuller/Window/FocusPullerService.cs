@@ -1,15 +1,16 @@
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using System.Diagnostics;
 
 namespace FocusPuller;
 
 public class FocusPullerService
 {
-    private readonly WindowFinder _windowFinder;
-    private readonly DispatcherTimer _timer;
+    private WindowFinder _windowFinder;
+    private DispatcherTimer _timer;
     private IntPtr _targetWindowHandle;
-    private string? _targetClassName;
-    private string? _targetTitlePrefix;
+    private string _targetClassName;
+    private string _targetTitle;
     private int _refocusDelayInMilliseconds;
     private bool _isEnabled;
     private DateTime _lastFocusLostTime;
@@ -20,39 +21,36 @@ public class FocusPullerService
     public FocusPullerService(WindowFinder windowFinder)
     {
         _windowFinder = windowFinder;
-        _timer = new DispatcherTimer();
-        _timer.Interval = TimeSpan.FromMilliseconds(500); // Check every 500ms
-        _timer.Tick += Timer_Tick;
     }
 
     public bool IsRunning => _isEnabled;
     public IntPtr TargetHandle => _targetWindowHandle;
 
-    public void Start(int refocusDelayInMilliseconds, string targetClassName, string targetTitlePrefix)
+    public void Start(int refocusDelayInMilliseconds, string targetClassName, string targetTitle)
     {
         _targetClassName = targetClassName;
-        _targetTitlePrefix = targetTitlePrefix;
+        _targetTitle = targetTitle;
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
         _isEnabled = true;
         _focusLost = false;
+        
+        _timer = new DispatcherTimer();
+        _timer.Interval = TimeSpan.FromMilliseconds(500); // Check every 500ms
+        _timer.Tick += Timer_Tick;
         _timer.Start();
     }
 
     public void Stop()
     {
         _isEnabled = false;
-        _timer.Stop();
+        _targetWindowHandle = IntPtr.Zero;
+        _timer?.Stop();
+        _timer = null;
     }
 
     public void UpdateDelay(int refocusDelayInMilliseconds)
     {
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
-    }
-
-    public void UpdateTargetWindow(IntPtr targetWindowHandle)
-    {
-        _targetWindowHandle = targetWindowHandle;
-        _focusLost = false;
     }
 
     private int GetTitleBarClickY(NativeMethods.RECT rect, IntPtr hWnd)
@@ -96,13 +94,17 @@ public class FocusPullerService
             return;
         }
 
-        // If we don't have a handle but have class/title info, try to find the window
-        if (_targetWindowHandle == IntPtr.Zero && !string.IsNullOrEmpty(_targetTitlePrefix))
+        // If we don't have a handle try to find the window
+        if (_targetWindowHandle == IntPtr.Zero && !string.IsNullOrEmpty(_targetTitle))
         {
             var targetWindow = _windowFinder.FindTargetWindow();
-            if (targetWindow != null)
+            if (targetWindow != null && targetWindow.Title.StartsWith(_targetTitle, StringComparison.OrdinalIgnoreCase))
             {
                 _targetWindowHandle = targetWindow.Handle;
+            }
+            else
+            {
+                return; // shouldn't usually happen
             }
         }
         else if (_targetWindowHandle == IntPtr.Zero)
@@ -118,19 +120,19 @@ public class FocusPullerService
             return;
         }
 
-        var foregroundWindow = GetForegroundWindow();
+        var foregroundWindow = NativeMethods.GetForegroundWindow();
         if (foregroundWindow != _targetWindowHandle)
         {
             // Target window lost focus
             if (!_focusLost)
             {
                 _focusLost = true;
-                _lastFocusLostTime = DateTime.Now;
+                _lastFocusLostTime = DateTime.UtcNow;
             }
             else
             {
                 // Check if enough time has passed and user is idle
-                var timeSinceFocusLost = (DateTime.Now - _lastFocusLostTime).TotalMilliseconds;
+                var timeSinceFocusLost = (DateTime.UtcNow - _lastFocusLostTime).TotalMilliseconds;
                 var idleTime = GetIdleTime();
 
                 if (timeSinceFocusLost >= _refocusDelayInMilliseconds && idleTime >= _refocusDelayInMilliseconds)
@@ -180,7 +182,8 @@ public class FocusPullerService
                         // Give this process permission to set foreground and then set foreground
                         var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
                         NativeMethods.AllowSetForegroundWindow(new IntPtr(pid));
-                        SetForegroundWindow(_targetWindowHandle);
+                        // Try to set foreground using API
+                        NativeMethods.SetForegroundWindow(_targetWindowHandle);
 
                         _focusLost = false;
                     }
@@ -198,33 +201,6 @@ public class FocusPullerService
         }
     }
 
-    private IntPtr GetForegroundWindow()
-    {
-        return NativeMethods.GetForegroundWindow();
-    }
-
-    private bool SetForegroundWindow(IntPtr hWnd)
-    {
-        if (!NativeMethods.IsWindow(hWnd))
-            return false;
-
-        // Only set foreground if not already focused
-        if (NativeMethods.GetForegroundWindow() == hWnd)
-            return true;
-
-        // Focus window
-        //NativeMethods.ShowWindow(hWnd, NativeMethods.SW_SHOW);
-        bool focused = NativeMethods.SetForegroundWindow(hWnd);
-
-        // set the cursor position to the center of the window
-        NativeMethods.GetWindowRect(hWnd, out var rect);
-        int centerX = (rect.Left + rect.Right) / 2;
-        int centerY = (rect.Top + rect.Bottom) / 2;
-        NativeMethods.SetCursorPos(centerX, centerY);
-
-        return focused;
-    }
-
     private uint GetIdleTime()
     {
         var lastInputInfo = new NativeMethods.LASTINPUTINFO();
@@ -238,5 +214,4 @@ public class FocusPullerService
 
         return 0;
     }
-
 }

@@ -36,8 +36,13 @@ public class WindowFinder
 
     public bool IsVisible(WindowInfo windowInfo)
     {
+        if (windowInfo == null)
+        {
+            return false;
+        }
+
         var windows = GetVisibleWindows();
-        return windows.Any(w => w.Handle == windowInfo.Handle);
+        return windows.Any(w => w.ClassName == windowInfo.ClassName && w.Title == windowInfo.Title);
     }
 
     private List<WindowInfo> GetVisibleWindows()

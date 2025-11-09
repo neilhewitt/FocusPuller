@@ -7,7 +7,7 @@ namespace FocusPuller;
 
 public partial class MainWindow : Window
 {
-    private const string NO_WINDOW_SELECTED = "No target window selected";
+    private const string NO_WINDOW_AVAILABLE = "No target window available";
     
     private FocusPullerService _focusPullerService;
     private Settings _settings;
@@ -22,7 +22,6 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _settings = new Settings();
-        _settings.Load();
 
         _windowFinder = new WindowFinder(_settings);
 
@@ -34,16 +33,11 @@ public partial class MainWindow : Window
         _windowCheckTimer.Tick += WindowCheckTimer_Tick;
         _windowCheckTimer.Start();
 
-        _windowListRefreshTimer = new System.Windows.Threading.DispatcherTimer();
-        _windowListRefreshTimer.Interval = TimeSpan.FromSeconds(3);
-        _windowListRefreshTimer.Tick += WindowListRefreshTimer_Tick;
-        _windowListRefreshTimer.Start();
-
         Initialise();
 
         if (_settings.Values.IsHideMode)
         {
-            MinimiseToTray();   
+            StartRefocusing();
         }
     }
 
@@ -54,13 +48,8 @@ public partial class MainWindow : Window
         _isRefocusing = HideModeCheckBox.IsChecked ?? false; // switch on if Hide Mode is enabled
 
         _targetWindow = _windowFinder.FindTargetWindow();
-        WindowStatusLabel.Text = _targetWindow?.Title ?? NO_WINDOW_SELECTED;
+        WindowStatusLabel.Text = _targetWindow?.Title ?? NO_WINDOW_AVAILABLE;
         
-        if (_settings.Values.IsHideMode && _targetWindow != null)
-        {
-            StartRefocusing();
-        }
-
         UpdateRefocusingButton();
     }
 
@@ -69,11 +58,12 @@ public partial class MainWindow : Window
         _settings.Values.RefocusDelayInMilliseconds = (int)DelaySlider.Value;
         _settings.Values.IsHideMode = HideModeCheckBox.IsChecked ?? false;
         _settings.Values.MatchingRules = _windowFinder.Rules;
-        _settings.Values.TargetWindowTitle = _targetWindow?.Title ?? "";
-        _settings.Values.TargetWindowClassName = _targetWindow?.ClassName ?? "";
 
         if (_targetWindow != null)
         {
+            _settings.Values.TargetWindowTitle = _targetWindow?.Title;
+            _settings.Values.TargetWindowClassName = _targetWindow?.ClassName;
+
             // If the selected window matches a rule, save the rule prefix instead of the full title
             var rule = _windowFinder.FindMatchingRule(_targetWindow.ClassName, _targetWindow.Title);
             if (rule != null)
@@ -89,14 +79,14 @@ public partial class MainWindow : Window
             }
         }
 
-        _settings.SaveSettings(_settings);
+        _settings.Save();
     }
 
     private void StartRefocusing()
     {
-        // Only show error if no window is selected at all (not even a placeholder)
-        if (_targetWindow == null)
+        if (_targetWindow == null && string.IsNullOrWhiteSpace(_settings.Values.TargetWindowTitle))
         {
+            RestoreFromTray();
             MessageBox.Show("Please select a target window first.", "No Target Window",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             _isRefocusing = false;
@@ -104,7 +94,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        _focusPullerService.Start((int)DelaySlider.Value, _targetWindow.ClassName, _targetWindow.Title);
+        _focusPullerService.Start((int)DelaySlider.Value, _settings.Values.TargetWindowClassName, _settings.Values.TargetWindowTitle);
         
         _isRefocusing = true;
         UpdateRefocusingButton();
@@ -133,44 +123,51 @@ public partial class MainWindow : Window
         }
 
         // Enable the refocus button only if a target window is selected.
-        RefocusingButton.IsEnabled = _targetWindow != null && (_targetWindow.Exists || _isRefocusing);
+        RefocusingButton.IsEnabled = _windowFinder.IsVisible(_targetWindow);
     }
 
     private void UpdateWindowStatus()
     {
+        bool hasSavedTargetWindow = !string.IsNullOrWhiteSpace(_settings.Values.TargetWindowTitle);
+
         // If no window is selected, clear the label
         if (_targetWindow == null)
         {
-            WindowStatusLabel.Text = NO_WINDOW_SELECTED;
-            UpdateRefocusingButton();
-            return;
+            _targetWindow = _windowFinder.FindTargetWindow();
         }
-        
-        if (!_windowFinder.IsVisible(_targetWindow))
+
+        if (_targetWindow == null && !hasSavedTargetWindow)
         {
-            WindowStatusLabel.Text = "Target window not open / available";
+            WindowStatusLabel.Text = NO_WINDOW_AVAILABLE;
+            WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
+        }
+        else if (!_windowFinder.IsVisible(_targetWindow))
+        {
+            WindowStatusLabel.Text = $"{_settings.Values.TargetWindowTitle.TrimEnd(' ', '-')}: not available";
             WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Red);
-            _targetWindow.Exists = false;
-            
+
             if (_isRefocusing)
             {
-                _focusPullerService.Stop();
+                StopRefocusing();
             }
         }
         else
         {
-            // Window exists
             WindowStatusLabel.Text = _targetWindow.Title;
             WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
-            _targetWindow.Exists = true;
+            
+            if (!hasSavedTargetWindow)
+            {
+                SaveSettings();
+            }
+            
+            if (_settings.Values.IsHideMode && !_isRefocusing)
+            {
+                StartRefocusing();
+            }
         }
-        
-        UpdateRefocusingButton();
-    }
 
-    private void WindowListRefreshTimer_Tick(object sender, EventArgs e)
-    {
-        UpdateWindowStatus();
+        UpdateRefocusingButton();
     }
 
     private void WindowCheckTimer_Tick(object sender, EventArgs e)
@@ -180,10 +177,15 @@ public partial class MainWindow : Window
 
     private void DelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_focusPullerService != null && _isRefocusing)
+        if (_settings != null && _settings.Values.RefocusDelayInMilliseconds != (int)e.NewValue)
         {
-            _focusPullerService.UpdateDelay((int)e.NewValue);
+            _settings.Values.RefocusDelayInMilliseconds = (int)e.NewValue;
             SaveSettings();
+        }
+
+        if (_focusPullerService != null)
+        {
+            _focusPullerService.UpdateDelay(_settings.Values.RefocusDelayInMilliseconds);
         }
     }
 
@@ -283,12 +285,6 @@ public partial class MainWindow : Window
 
     private void HideModeCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        // If Hide Mode is being enabled and we have a selected window, also enable refocusing
-        if (HideModeCheckBox.IsChecked == true && _targetWindow != null && !_isRefocusing)
-        {
-            StartRefocusing();
-        }
-        
         SaveSettings();
     }
 
@@ -298,11 +294,6 @@ public partial class MainWindow : Window
         {
             Hide();
         }
-    }
-
-    public void MinimiseToTray()
-    {
-        WindowState = WindowState.Minimized;
     }
 
     public void RestoreFromTray()
@@ -327,5 +318,13 @@ public partial class MainWindow : Window
         _windowListRefreshTimer?.Stop();
         _focusPullerService.Stop();
         SaveSettings();
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (_settings.Values.IsHideMode)
+        {
+            Hide();
+        }
     }
 }

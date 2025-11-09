@@ -5,7 +5,8 @@
         ResizeMode="CanMinimize"
         Icon="pack://application:,,,/focuspuller.ico"
         Closing="Window_Closing"
-        StateChanged="Window_StateChanged">
+        StateChanged="Window_StateChanged"
+        Loaded="Window_Loaded">
     <Window.Resources>
         <Style TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>

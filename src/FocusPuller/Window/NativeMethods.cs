@@ -130,4 +130,57 @@ public static class NativeMethods
 
     public const int SM_CYCAPTION = 4;
     public const int SM_CYFRAME = 33;
+
+    // Low-level input hook definitions
+    public delegate IntPtr LowLevelProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelProc lpfn, IntPtr hMod, uint dwThreadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    public const int WH_KEYBOARD_LL = 13;
+    public const int WH_MOUSE_LL = 14;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KBDLLHOOKSTRUCT
+    {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSLLHOOKSTRUCT
+    {
+        public POINT pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr GetModuleHandle(string lpModuleName);
+
+    // Touch / Pointer message constants and registration
+    public const int WM_TOUCH = 0x0240;
+    public const int WM_POINTERDOWN = 0x0246;
+    public const int WM_POINTERUPDATE = 0x0245;
+    public const int WM_POINTERUP = 0x0247;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool RegisterTouchWindow(IntPtr hwnd, uint ulFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnregisterTouchWindow(IntPtr hwnd);
 }

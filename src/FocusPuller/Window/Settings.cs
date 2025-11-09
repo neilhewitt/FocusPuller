@@ -27,29 +27,36 @@ public class Settings
 
     private string _path;
 
-    public SettingsValues Values { get; set; }
+    public SettingsValues Values { get; set; } = new SettingsValues();
 
-    public void Load(string settingsPath = null)
+    public Settings(string? path = null)
     {
-        if (settingsPath == null)
-        {
-            _path = GetDefaultSettingsPath();
-        }
-        else
-        {
-            _path = settingsPath;
-        }
+        _path = path ?? GetDefaultSettingsPath();
+        Load();
+    }
 
+    public void Save()
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            var json = JsonSerializer.Serialize(Values, options);
+            File.WriteAllText(_path, json);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to save settings: {ex.Message}");
+        }
+    }
+
+    private void Load()
+    {
         try
         {
             if (File.Exists(_path))
             {
                 var json = File.ReadAllText(_path);
                 Values = JsonSerializer.Deserialize<SettingsValues>(json);
-            }
-            else
-            {
-                Values = new SettingsValues();
             }
         }
         catch (Exception ex)
@@ -75,20 +82,6 @@ public class Settings
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load default rules: {ex.Message}");
-        }
-    }
-
-    public void SaveSettings(Settings settings)
-    {
-        try
-        {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            var json = JsonSerializer.Serialize(settings, options);
-            File.WriteAllText(_path, json);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to save settings: {ex.Message}");
         }
     }
 }
