@@ -15,23 +15,29 @@ public class SettingsValues
 
 public class Settings
 {
-    public static string GetDefaultSettingsPath()
+    public const string SETTINGS_FILENAME = "settings.json";
+    public const string RULES_FILENAME = "defaultrules.json";
+
+    public static string GetDefaultSettingsFolder()
     {
-        var programDataPath = Path.Combine(
+        return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "FocusPuller");
-
-        Directory.CreateDirectory(programDataPath);
-        return Path.Combine(programDataPath, "settings.json");
     }
 
-    private string _path;
+    private string _settingsFolder;
+    private string _settingsPath;
 
     public SettingsValues Values { get; set; } = new SettingsValues();
 
-    public Settings(string? path = null)
+    public Settings()
     {
-        _path = path ?? GetDefaultSettingsPath();
+        _settingsFolder = GetDefaultSettingsFolder();
+        
+        // ensure the ProgramData/FocusPuller folder exists
+        Directory.CreateDirectory(_settingsFolder);
+
+        _settingsPath = Path.Combine(_settingsFolder, SETTINGS_FILENAME);
         Load();
     }
 
@@ -41,7 +47,7 @@ public class Settings
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(Values, options);
-            File.WriteAllText(_path, json);
+            File.WriteAllText(_settingsPath, json);
         }
         catch (Exception ex)
         {
@@ -53,9 +59,9 @@ public class Settings
     {
         try
         {
-            if (File.Exists(_path))
+            if (File.Exists(_settingsPath))
             {
-                var json = File.ReadAllText(_path);
+                var json = File.ReadAllText(_settingsPath);
                 Values = JsonSerializer.Deserialize<SettingsValues>(json);
             }
         }
@@ -66,12 +72,11 @@ public class Settings
 
         try
         {
-            // Look for defaultrules.json next to the application executable
-            var appBase = AppContext.BaseDirectory;
-            var defaultRulesPath = Path.Combine(appBase, "defaultrules.json");
-            if (File.Exists(defaultRulesPath))
+            // Look for defaultrules.json
+            var appRulesPath = Path.Combine(AppContext.BaseDirectory, RULES_FILENAME);
+            if (File.Exists(appRulesPath))
             {
-                var rulesJson = File.ReadAllText(defaultRulesPath);
+                var rulesJson = File.ReadAllText(appRulesPath);
                 var rulesData = JsonSerializer.Deserialize<List<WindowFinderRule>>(rulesJson);
                 if (rulesData != null && rulesData.Count > 0)
                 {
