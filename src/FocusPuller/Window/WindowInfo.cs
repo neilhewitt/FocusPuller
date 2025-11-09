@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace FocusPuller.Models;
+namespace FocusPuller;
 
 public class WindowInfo : INotifyPropertyChanged
 {

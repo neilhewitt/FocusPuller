@@ -1,40 +1,61 @@
 using System.IO;
 using System.Text.Json;
-using FocusPuller.Models;
 
-namespace FocusPuller.Services;
+namespace FocusPuller;
 
-public class SettingsManager
+public class SettingsValues
 {
-    private readonly string _settingsPath;
+    public int RefocusDelayInMilliseconds { get; set; } = 5000;
+    public bool IsHideMode { get; set; } = false;
+    public string TargetWindowTitle { get; set; } = "";
+    public string TargetWindowClassName { get; set; } = "";
+    public bool AllowOnlyRuleDefinedWindows { get; set; } = false;
+    public List<WindowFinderRule> MatchingRules { get; set; } = new List<WindowFinderRule>();
+}
 
-    public SettingsManager()
+public class Settings
+{
+    public static string GetDefaultSettingsPath()
     {
         var programDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "FocusPuller");
-        
+
         Directory.CreateDirectory(programDataPath);
-        _settingsPath = Path.Combine(programDataPath, "settings.json");
+        return Path.Combine(programDataPath, "settings.json");
     }
 
-    public AppSettings LoadSettings()
+    private string _path;
+
+    public SettingsValues Values { get; set; }
+
+    public void Load(string settingsPath = null)
     {
+        if (settingsPath == null)
+        {
+            _path = GetDefaultSettingsPath();
+        }
+        else
+        {
+            _path = settingsPath;
+        }
+
         try
         {
-            if (File.Exists(_settingsPath))
+            if (File.Exists(_path))
             {
-                var json = File.ReadAllText(_settingsPath);
-                return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                var json = File.ReadAllText(_path);
+                Values = JsonSerializer.Deserialize<SettingsValues>(json);
+            }
+            else
+            {
+                Values = new SettingsValues();
             }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
         }
-
-        // No settings file exists - initialize default settings
-        var defaultSettings = new AppSettings();
 
         try
         {
@@ -44,10 +65,10 @@ public class SettingsManager
             if (File.Exists(defaultRulesPath))
             {
                 var rulesJson = File.ReadAllText(defaultRulesPath);
-                var rulesData = JsonSerializer.Deserialize<List<WindowMatchingRuleData>>(rulesJson);
+                var rulesData = JsonSerializer.Deserialize<List<WindowFinderRule>>(rulesJson);
                 if (rulesData != null && rulesData.Count > 0)
                 {
-                    defaultSettings.MatchingRules = rulesData;
+                    Values.MatchingRules = rulesData;
                 }
             }
         }
@@ -55,18 +76,15 @@ public class SettingsManager
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load default rules: {ex.Message}");
         }
-
-        SaveSettings(defaultSettings);
-        return defaultSettings;
     }
 
-    public void SaveSettings(AppSettings settings)
+    public void SaveSettings(Settings settings)
     {
         try
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(settings, options);
-            File.WriteAllText(_settingsPath, json);
+            File.WriteAllText(_path, json);
         }
         catch (Exception ex)
         {

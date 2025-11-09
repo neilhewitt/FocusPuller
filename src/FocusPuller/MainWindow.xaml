@@ -42,61 +42,24 @@
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                
-                <Grid Grid.Row="0">
-                    <ComboBox x:Name="WindowComboBox" 
-                              SelectionChanged="WindowComboBox_SelectionChanged">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DisplayName}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="Black"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Exists}" Value="False">
-                                                    <Setter Property="Foreground" Value="Red"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                    
-                    <!-- Placeholder text overlay -->
-                    <TextBlock x:Name="PlaceholderText" Text="Click to select target window"
-                               Foreground="Gray"
-                               Margin="8,0,0,0"
-                               IsHitTestVisible="False"
-                               VerticalAlignment="Center">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ElementName=WindowComboBox, Path=SelectedItem}" Value="{x:Null}">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </Grid>
-                
-                <Grid Grid.Row="2">
+                                
+                <Grid Grid.Row="0" Grid.RowSpan="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
+
+                    <Border BorderBrush="Gray" BorderThickness="0" CornerRadius="1" Padding="4" Background="White">
+                        <TextBlock x:Name="WindowStatusLabel"
+                           Grid.Column="1"
+                           Text="{Binding ElementName=SelectedWindow, Path=StatusMessage}"
+                           Foreground="Black"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"
+                           Margin="10,0,0,0"/>
+                    </Border>
                     
-                    <TextBlock x:Name="WindowStatusLabel"
-                               Grid.Column="1"
-                               Text="{Binding ElementName=SelectedWindow, Path=StatusMessage}"
-                               Foreground="Red"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Center"
-                               Margin="10,0,0,0"/>
                 </Grid>
             </Grid>
         </GroupBox>

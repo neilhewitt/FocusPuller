@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace FocusPuller.Interop;
+namespace FocusPuller;
 
 public static class NativeMethods
 {
@@ -43,7 +43,6 @@ public static class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
-    // Corrected signature for GetLastInputInfo
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);

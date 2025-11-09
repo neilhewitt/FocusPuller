@@ -4,11 +4,6 @@ using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
 using Hardcodet.Wpf.TaskbarNotification;
-using FocusPuller.Services;
-using System.IO;
-using System.Reflection;
-using System.Diagnostics;
-using FocusPuller.Interop;
 
 namespace FocusPuller;
 
@@ -41,28 +36,9 @@ public partial class App : Application
             }
         }
 
-        // Load settings to check hide mode
-        var settingsManager = new SettingsManager();
-        var settings = settingsManager.LoadSettings();
-
         // Create main window
         _mainWindow = new MainWindow();
-
-        if (settings.IsHideMode)
-        {
-            // Show the window initially, then minimize to tray
-            _mainWindow.Show();
-
-            // Minimize after layout so user briefly sees UI before it goes to tray
-            _mainWindow.Dispatcher.BeginInvoke(new Action(() => {
-                _mainWindow.WindowState = WindowState.Minimized;
-            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-        }
-        else
-        {
-            // Start normally - show window, refocusing off
-            _mainWindow.Show();
-        }
+        _mainWindow.Show();
     }
 
     private void Application_Startup(object sender, StartupEventArgs e)
