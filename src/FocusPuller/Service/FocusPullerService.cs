@@ -9,8 +9,6 @@ public class FocusPullerService
     private WindowFinder _windowFinder;
     private DispatcherTimer _timer;
     private IntPtr _targetWindowHandle;
-    private string _targetClassName;
-    private string _targetTitle;
     private int _refocusDelayInMilliseconds;
     private bool _isEnabled;
     private DateTime _lastFocusLostTime;
@@ -26,10 +24,8 @@ public class FocusPullerService
     public bool IsRunning => _isEnabled;
     public IntPtr TargetHandle => _targetWindowHandle;
 
-    public void Start(int refocusDelayInMilliseconds, string targetClassName, string targetTitle)
+    public void Start(int refocusDelayInMilliseconds)
     {
-        _targetClassName = targetClassName;
-        _targetTitle = targetTitle;
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
         _isEnabled = true;
         _focusLost = false;
@@ -53,40 +49,6 @@ public class FocusPullerService
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
     }
 
-    private int GetTitleBarClickY(NativeMethods.RECT rect, IntPtr hWnd)
-    {
-        // Default fallback: click 1/12th down from top or at least 8px
-        int fallback = rect.Top + Math.Max(8, rect.Height / 12);
-
-        try
-        {
-            // Determine if window style includes a caption/title bar
-            var stylePtr = NativeMethods.GetWindowLongPtr(hWnd, NativeMethods.GWL_STYLE);
-            bool hasCaption = (stylePtr.ToInt64() & NativeMethods.WS_CAPTION) != 0;
-
-            int captionHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYCAPTION);
-            int frameHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYFRAME);
-
-            if (hasCaption)
-            {
-                // Titlebar height includes caption + frame
-                int titleBarHeight = captionHeight + frameHeight;
-                // Click halfway through the title bar area
-                return rect.Top + titleBarHeight / 2;
-            }
-            else
-            {
-                // No caption - click near the top edge within a small area
-                int topArea = Math.Max(8, Math.Min(rect.Height / 12, 48));
-                return rect.Top + topArea / 2;
-            }
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
     private void Timer_Tick(object sender, EventArgs e)
     {
         if (!_isEnabled)
@@ -94,22 +56,18 @@ public class FocusPullerService
             return;
         }
 
-        // If we don't have a handle try to find the window
-        if (_targetWindowHandle == IntPtr.Zero && !string.IsNullOrEmpty(_targetTitle))
+        // If we don't have a handle try to find the right window
+        if (_targetWindowHandle == IntPtr.Zero)
         {
-            var targetWindow = _windowFinder.FindTargetWindow();
-            if (targetWindow != null && targetWindow.Title.StartsWith(_targetTitle, StringComparison.OrdinalIgnoreCase))
+            var targetWindow = _windowFinder.FindTargetWindow(); // finds an open target based on the rules
+            if (targetWindow != null)
             {
                 _targetWindowHandle = targetWindow.Handle;
             }
             else
             {
-                return; // shouldn't usually happen
+                return;
             }
-        }
-        else if (_targetWindowHandle == IntPtr.Zero)
-        {
-            return;
         }
 
         // Check if target window still exists
@@ -179,17 +137,12 @@ public class FocusPullerService
                                 NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
                         }
 
-                        // Give this process permission to set foreground and then set foreground
-                        var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
-                        NativeMethods.AllowSetForegroundWindow(new IntPtr(pid));
-                        // Try to set foreground using API
-                        NativeMethods.SetForegroundWindow(_targetWindowHandle);
-
                         _focusLost = false;
                     }
                     catch
                     {
-                        // Swallow exceptions to avoid crashing timer thread
+                        // Swallow exceptions to avoid crashing timer thread, but log to the debug output
+                        Debug.WriteLine("FocusPullerService: Exception occurred while trying to refocus target window.");
                     }
                 }
             }
@@ -213,5 +166,38 @@ public class FocusPullerService
         }
 
         return 0;
+    }
+
+    private int GetTitleBarClickY(NativeMethods.RECT rect, IntPtr hWnd)
+    {
+        // Default fallback: click 1/12th down from top or at least 8px
+        int fallback = rect.Top + Math.Max(8, rect.Height / 12);
+
+        try
+        {
+            // Determine if window style includes a caption/title bar
+            var stylePtr = NativeMethods.GetWindowLongPtr(hWnd, NativeMethods.GWL_STYLE);
+            bool hasCaption = (stylePtr.ToInt64() & NativeMethods.WS_CAPTION) != 0;
+
+            int captionHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYCAPTION);
+            int frameHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYFRAME);
+
+            if (hasCaption)
+            {
+                // Titlebar height includes caption + frame
+                int titleBarHeight = captionHeight + frameHeight;
+                return rect.Top + titleBarHeight / 2;
+            }
+            else
+            {
+                // No caption - click near the top edge within a small area
+                int topArea = Math.Max(8, Math.Min(rect.Height / 12, 48));
+                return rect.Top + topArea / 2;
+            }
+        }
+        catch
+        {
+            return fallback;
+        }
     }
 }

@@ -38,34 +38,4 @@ public class WindowFinderRule
 
         return false;
     }
-
-    /// <summary>
-    /// Checks if a saved window title matches a current window title using this rule
-    /// </summary>
-    public bool MatchesWindow(string className, string existingTitle, string currentTitle)
-    {
-        if (className != ClassName)
-        {
-            return false;
-        }
-
-        // Check if both titles match any of the prefixes
-        bool existingMatches = false;
-        bool currentMatches = false;
-
-        foreach (var prefix in TitlePrefixes)
-        {
-            if (!string.IsNullOrEmpty(existingTitle) && existingTitle.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                existingMatches = true;
-            }
-
-            if (!string.IsNullOrEmpty(currentTitle) && currentTitle.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                currentMatches = true;
-            }
-        }
-
-        return existingMatches && currentMatches;
-    }
 }

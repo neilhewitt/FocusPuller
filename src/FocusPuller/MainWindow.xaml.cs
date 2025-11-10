@@ -6,9 +6,7 @@ using System.Windows.Media;
 namespace FocusPuller;
 
 public partial class MainWindow : Window
-{
-    private const string NO_WINDOW_AVAILABLE = "No target window available";
-    
+{    
     private FocusPullerService _focusPullerService;
     private Settings _settings;
     private WindowFinder _windowFinder;
@@ -41,6 +39,13 @@ public partial class MainWindow : Window
         }
     }
 
+    public void RestoreFromTray()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
     private void Initialise()
     {
         DelaySlider.Value = _settings.Values.RefocusDelayInMilliseconds;
@@ -48,7 +53,7 @@ public partial class MainWindow : Window
         _isRefocusing = HideModeCheckBox.IsChecked ?? false; // switch on if Hide Mode is enabled
 
         _targetWindow = _windowFinder.FindTargetWindow();
-        WindowStatusLabel.Text = _targetWindow?.Title ?? NO_WINDOW_AVAILABLE;
+        WindowStatusLabel.Text = _targetWindow?.Title ?? "No target window available";
         
         UpdateRefocusingButton();
     }
@@ -65,7 +70,7 @@ public partial class MainWindow : Window
             _settings.Values.TargetWindowClassName = _targetWindow?.ClassName;
 
             // If the selected window matches a rule, save the rule prefix instead of the full title
-            var rule = _windowFinder.FindMatchingRule(_targetWindow.ClassName, _targetWindow.Title);
+            var rule = _windowFinder.FindRule(_targetWindow.ClassName, _targetWindow.Title);
             if (rule != null)
             {
                 // Find the first prefix that matches the window title
@@ -87,14 +92,15 @@ public partial class MainWindow : Window
         if (_targetWindow == null && string.IsNullOrWhiteSpace(_settings.Values.TargetWindowTitle))
         {
             RestoreFromTray();
-            MessageBox.Show("Please select a target window first.", "No Target Window",
+            
+            MessageBox.Show("Please select a target window first.", "No Target Window selected",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             _isRefocusing = false;
             UpdateRefocusingButton();
             return;
         }
 
-        _focusPullerService.Start((int)DelaySlider.Value, _settings.Values.TargetWindowClassName, _settings.Values.TargetWindowTitle);
+        _focusPullerService.Start((int)DelaySlider.Value);
         
         _isRefocusing = true;
         UpdateRefocusingButton();
@@ -122,7 +128,7 @@ public partial class MainWindow : Window
             RefocusingButton.Background = new SolidColorBrush(Colors.Red);
         }
 
-        // Enable the refocus button only if a target window is selected.
+        // Enable the refocus button only if a target window is available
         RefocusingButton.IsEnabled = _windowFinder.IsVisible(_targetWindow);
     }
 
@@ -138,12 +144,12 @@ public partial class MainWindow : Window
 
         if (_targetWindow == null && !hasSavedTargetWindow)
         {
-            WindowStatusLabel.Text = NO_WINDOW_AVAILABLE;
+            WindowStatusLabel.Text = "No target window available";
             WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
         }
         else if (!_windowFinder.IsVisible(_targetWindow))
         {
-            WindowStatusLabel.Text = $"{_settings.Values.TargetWindowTitle.TrimEnd(' ', '-')}: not available";
+            WindowStatusLabel.Text = $"{_settings.Values.TargetWindowTitle.TrimEnd(' ', '-')} not available";
             WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Red);
 
             if (_isRefocusing)
@@ -294,13 +300,6 @@ public partial class MainWindow : Window
         {
             Hide();
         }
-    }
-
-    public void RestoreFromTray()
-    {
-        Show();
-        WindowState = WindowState.Normal;
-        Activate();
     }
 
     private void FocusPullerService_TargetWindowClosed(object sender, EventArgs e)

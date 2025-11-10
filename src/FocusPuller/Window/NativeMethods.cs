@@ -5,7 +5,92 @@ namespace FocusPuller;
 
 public static class NativeMethods
 {
+    public const int SW_RESTORE = 9;
+    public const int SW_SHOW = 5;
+    public const int SW_SHOWDEFAULT = 10;
+
+    public const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
+    public const uint MOUSEEVENTF_LEFTUP = 0x0004;
+
+    public const uint SWP_NOMOVE = 0x0002;
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOACTIVATE = 0x0010;
+
+    public const int GWL_EXSTYLE = -20;
+    public const int WS_EX_TOPMOST = 0x00000008;
+
+    public const int WH_KEYBOARD_LL = 13;
+    public const int WH_MOUSE_LL = 14;
+
+    public const int SM_CYCAPTION = 4;
+    public const int SM_CYFRAME = 33;
+
+    public const int GWL_STYLE = -16;
+    public const int WS_CAPTION = 0x00C00000; // WS_BORDER | WS_DLGFRAME typically
+
+    public const int WM_TOUCH = 0x0240;
+    public const int WM_POINTERDOWN = 0x0246;
+    public const int WM_POINTERUPDATE = 0x0245;
+    public const int WM_POINTERUP = 0x0247;
+
+    public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    public static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    public delegate IntPtr LowLevelProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KBDLLHOOKSTRUCT
+    {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSLLHOOKSTRUCT
+    {
+        public POINT pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+
+        public int Width => Right - Left;
+        public int Height => Bottom - Top;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    public static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
+    {
+        if (IntPtr.Size == 8)
+            return GetWindowLongPtr64(hWnd, nIndex);
+        return new IntPtr(GetWindowLong32(hWnd, nIndex));
+    }
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -50,13 +135,6 @@ public static class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern uint GetTickCount();
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct LASTINPUTINFO
-    {
-        public uint cbSize;
-        public uint dwTime;
-    }
-
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindow(IntPtr hWnd);
@@ -68,43 +146,6 @@ public static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-
-        public int Width => Right - Left;
-        public int Height => Bottom - Top;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct POINT
-    {
-        public int X;
-        public int Y;
-    }
-
-    public const int SW_RESTORE = 9;
-    public const int SW_SHOW = 5;
-    public const int SW_SHOWDEFAULT = 10;
-
-    public const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
-    public const uint MOUSEEVENTF_LEFTUP = 0x0004;
-
-    // SetWindowPos / topmost helpers
-    public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
-    public static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
-
-    public const uint SWP_NOMOVE = 0x0002;
-    public const uint SWP_NOSIZE = 0x0001;
-    public const uint SWP_NOACTIVATE = 0x0010;
-
-    public const int GWL_EXSTYLE = -20;
-    public const int WS_EX_TOPMOST = 0x00000008;
-
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
@@ -114,25 +155,8 @@ public static class NativeMethods
     [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
     private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
 
-    public static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
-    {
-        if (IntPtr.Size == 8)
-            return GetWindowLongPtr64(hWnd, nIndex);
-        return new IntPtr(GetWindowLong32(hWnd, nIndex));
-    }
-
-    // Added for title bar height calculations
-    public const int GWL_STYLE = -16;
-    public const int WS_CAPTION = 0x00C00000; // WS_BORDER | WS_DLGFRAME typically
-
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int nIndex);
-
-    public const int SM_CYCAPTION = 4;
-    public const int SM_CYFRAME = 33;
-
-    // Low-level input hook definitions
-    public delegate IntPtr LowLevelProc(int nCode, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelProc lpfn, IntPtr hMod, uint dwThreadId);
@@ -144,37 +168,8 @@ public static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
 
-    public const int WH_KEYBOARD_LL = 13;
-    public const int WH_MOUSE_LL = 14;
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct KBDLLHOOKSTRUCT
-    {
-        public uint vkCode;
-        public uint scanCode;
-        public uint flags;
-        public uint time;
-        public IntPtr dwExtraInfo;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct MSLLHOOKSTRUCT
-    {
-        public POINT pt;
-        public uint mouseData;
-        public uint flags;
-        public uint time;
-        public IntPtr dwExtraInfo;
-    }
-
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern IntPtr GetModuleHandle(string lpModuleName);
-
-    // Touch / Pointer message constants and registration
-    public const int WM_TOUCH = 0x0240;
-    public const int WM_POINTERDOWN = 0x0246;
-    public const int WM_POINTERUPDATE = 0x0245;
-    public const int WM_POINTERUP = 0x0247;
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

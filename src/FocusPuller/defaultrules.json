@@ -1,10 +1,16 @@
 [
   {
-    "ClassName": "AceApp",
+     "ClassName": "Notepad",
     "TitlePrefixes": [
-      "Microsoft Flight Simulator 2024 -",
-      "Microsoft Flight Simulator 2020 -",
-      "Microsoft Flight Simulator -"
+      ""
     ]
-  }
+  },
+    {
+      "ClassName": "AceApp",
+      "TitlePrefixes": [
+        "Microsoft Flight Simulator 2024 -",
+        "Microsoft Flight Simulator 2020 -",
+        "Microsoft Flight Simulator -"
+      ]
+    }
 ]

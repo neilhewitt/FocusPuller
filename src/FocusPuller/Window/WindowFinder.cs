@@ -34,6 +34,20 @@ public class WindowFinder
         return null;
     }
 
+    public WindowFinderRule FindRule(string className, string title)
+    {
+        foreach (var rule in Rules)
+        {
+            if (rule.Matches(className, title))
+            {
+                return rule;
+            }
+        }
+
+        return null;
+    }
+
+
     public bool IsVisible(WindowInfo windowInfo)
     {
         if (windowInfo == null)
@@ -69,26 +83,10 @@ public class WindowFinder
                 }
             }
 
-            return true; // Continue enumeration
+            return true;
         }, IntPtr.Zero);
 
         return windows;
-    }
-
-    /// <summary>
-    /// Finds a matching rule for the given window
-    /// </summary>
-    public WindowFinderRule FindMatchingRule(string className, string title)
-    {
-        foreach (var rule in Rules)
-        {
-            if (rule.Matches(className, title))
-            {
-                return rule;
-            }
-        }
-
-        return null;
     }
 
     private List<WindowFinderRule> InitialiseDefaultRules()
