@@ -1,10 +1,4 @@
 [
-  {
-     "ClassName": "Notepad",
-    "TitlePrefixes": [
-      ""
-    ]
-  },
     {
       "ClassName": "AceApp",
       "TitlePrefixes": [
