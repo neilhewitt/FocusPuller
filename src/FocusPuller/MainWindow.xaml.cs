@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     private WindowFinder _windowFinder;
     private WindowInfo _targetWindow;
     private bool _isRefocusing = false;
+    private bool _refocusingDisabled = false;
     private System.Windows.Threading.DispatcherTimer _windowCheckTimer;
     private System.Windows.Threading.DispatcherTimer _windowListRefreshTimer;
 
@@ -129,7 +130,16 @@ public partial class MainWindow : Window
         }
 
         // Enable the refocus button only if a target window is available
-        RefocusingButton.IsEnabled = _windowFinder.IsVisible(_targetWindow);
+        if (_windowFinder.IsVisible(_targetWindow))
+        {
+            _refocusingDisabled = false;
+        }
+        else
+        {
+            RefocusingButton.Content = "Not available";
+            RefocusingButton.Background = new SolidColorBrush(Colors.DarkGray);
+            _refocusingDisabled = true;
+        }
     }
 
     private void UpdateWindowStatus()
@@ -144,7 +154,7 @@ public partial class MainWindow : Window
 
         if (_targetWindow == null && !hasSavedTargetWindow)
         {
-            WindowStatusLabel.Text = "No target window available";
+            WindowStatusLabel.Text = "No target window available yet";
             WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
         }
         else if (!_windowFinder.IsVisible(_targetWindow))
@@ -279,6 +289,11 @@ public partial class MainWindow : Window
 
     private void RefocusingButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_refocusingDisabled)
+        {
+            return;
+        }
+
         if (_isRefocusing)
         {
             StopRefocusing();

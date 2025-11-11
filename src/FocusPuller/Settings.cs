@@ -72,15 +72,18 @@ public class Settings
 
         try
         {
-            // Look for defaultrules.json
-            var appRulesPath = Path.Combine(AppContext.BaseDirectory, RULES_FILENAME);
-            if (File.Exists(appRulesPath))
+            if (Values.MatchingRules?.Count == 0)
             {
-                var rulesJson = File.ReadAllText(appRulesPath);
-                var rulesData = JsonSerializer.Deserialize<List<WindowFinderRule>>(rulesJson);
-                if (rulesData != null && rulesData.Count > 0)
+                // Look for defaultrules.json
+                var appRulesPath = Path.Combine(AppContext.BaseDirectory, RULES_FILENAME);
+                if (File.Exists(appRulesPath))
                 {
-                    Values.MatchingRules = rulesData;
+                    var rulesJson = File.ReadAllText(appRulesPath);
+                    var rulesData = JsonSerializer.Deserialize<List<WindowFinderRule>>(rulesJson);
+                    if (rulesData != null && rulesData.Count > 0)
+                    {
+                        Values.MatchingRules = rulesData;
+                    }
                 }
             }
         }
