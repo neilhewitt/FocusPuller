@@ -14,7 +14,6 @@ public partial class MainWindow : Window
     private bool _isRefocusing = false;
     private bool _refocusingDisabled = false;
     private System.Windows.Threading.DispatcherTimer _windowCheckTimer;
-    private System.Windows.Threading.DispatcherTimer _windowListRefreshTimer;
 
     public MainWindow()
     {
@@ -329,7 +328,6 @@ public partial class MainWindow : Window
     {
         // Stop background timers and services
         _windowCheckTimer?.Stop();
-        _windowListRefreshTimer?.Stop();
         _focusPullerService.Stop();
         SaveSettings();
     }
