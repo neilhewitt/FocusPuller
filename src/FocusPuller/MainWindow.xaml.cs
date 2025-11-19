@@ -19,23 +19,33 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _settings = new Settings();
-
-        _windowFinder = new WindowFinder(_settings);
-
-        _focusPullerService = new FocusPullerService(_windowFinder);
-        _focusPullerService.TargetWindowClosed += FocusPullerService_TargetWindowClosed;
-
-        _windowCheckTimer = new System.Windows.Threading.DispatcherTimer();
-        _windowCheckTimer.Interval = TimeSpan.FromMilliseconds(500);
-        _windowCheckTimer.Tick += WindowCheckTimer_Tick;
-        _windowCheckTimer.Start();
-
-        Initialise();
-
-        if (_settings.Values.IsHideMode)
+        try
         {
-            StartRefocusing();
+
+            _settings = new Settings();
+
+            _windowFinder = new WindowFinder(_settings);
+
+            _focusPullerService = new FocusPullerService(_windowFinder);
+            _focusPullerService.TargetWindowClosed += FocusPullerService_TargetWindowClosed;
+
+            _windowCheckTimer = new System.Windows.Threading.DispatcherTimer();
+            _windowCheckTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _windowCheckTimer.Tick += WindowCheckTimer_Tick;
+            _windowCheckTimer.Start();
+
+            Initialise();
+
+            if (_settings.Values.IsHideMode)
+            {
+                StartRefocusing();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"An error occurred during initialization: {ex.Message}", "Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            Application.Current.Shutdown();
         }
     }
 

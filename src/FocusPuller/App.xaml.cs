@@ -19,31 +19,40 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Prefer the TaskbarIcon declared in App.xaml resources so its ContextMenu and handlers wired in XAML work
-        if (this.Resources.Contains("TrayIcon") && this.Resources["TrayIcon"] is TaskbarIcon resourceIcon)
+        try
         {
-            _trayIcon = resourceIcon;
-        }
-        else
-        {
-            // Fallback: create programmatically
-            _trayIcon = new TaskbarIcon();
-            _trayIcon.TrayMouseDoubleClick += TrayIcon_TrayMouseDoubleClick;
-            _trayIcon.ToolTipText = "FocusPuller";
 
-            var iconUri = new Uri("pack://application:,,,/focuspuller.ico", UriKind.Absolute);
-            using (var stream = Application.GetResourceStream(iconUri)?.Stream)
+            // Prefer the TaskbarIcon declared in App.xaml resources so its ContextMenu and handlers wired in XAML work
+            if (this.Resources.Contains("TrayIcon") && this.Resources["TrayIcon"] is TaskbarIcon resourceIcon)
             {
-                if (stream != null)
+                _trayIcon = resourceIcon;
+            }
+            else
+            {
+                // Fallback: create programmatically
+                _trayIcon = new TaskbarIcon();
+                _trayIcon.TrayMouseDoubleClick += TrayIcon_TrayMouseDoubleClick;
+                _trayIcon.ToolTipText = "FocusPuller";
+
+                var iconUri = new Uri("pack://application:,,,/focuspuller.ico", UriKind.Absolute);
+                using (var stream = Application.GetResourceStream(iconUri)?.Stream)
                 {
-                    _trayIcon.Icon = new Icon(stream);
+                    if (stream != null)
+                    {
+                        _trayIcon.Icon = new Icon(stream);
+                    }
                 }
             }
-        }
 
-        // Create main window
-        _mainWindow = new MainWindow();
-        _mainWindow.Show();
+            // Create main window
+            _mainWindow = new MainWindow();
+            _mainWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("An error occurred during application startup:\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
     }
 
     private void Application_Startup(object sender, StartupEventArgs e)
