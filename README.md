@@ -64,7 +64,7 @@ Settings are automatically saved as they change to:
 
 ## Details
 
-- **Framework**: .NET 9 (Windows)
+- **Framework**: .NET 10 (Windows)
 - **UI**: WPF
 - **Dependencies**: Hardcodet.NotifyIcon.Wpf (for system tray support)
 
