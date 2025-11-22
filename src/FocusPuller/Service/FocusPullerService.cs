@@ -100,49 +100,46 @@ public class FocusPullerService
                         // Restore target window (in case minimized)
                         NativeMethods.ShowWindow(_targetWindowHandle, NativeMethods.SW_RESTORE);
 
-                        // Determine whether the window is already topmost
-                        var exStylePtr = NativeMethods.GetWindowLongPtr(_targetWindowHandle, NativeMethods.GWL_EXSTYLE);
-                        bool wasTopMost = (exStylePtr.ToInt64() & NativeMethods.WS_EX_TOPMOST) != 0;
-
-                        // If not topmost, temporarily set it topmost so a click will bring it to foreground
-                        bool madeTopMost = false;
-                        if (!wasTopMost)
+                        // set it topmost temporarily to force focus
+                        if (NativeMethods.SetWindowPos(_targetWindowHandle, NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
+                                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE))
                         {
-                            madeTopMost = NativeMethods.SetWindowPos(_targetWindowHandle, NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
-                                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
-                        }
 
-                        // Simulate a click in the horizontal center of the target window's title bar / top area
-                        if (NativeMethods.GetWindowRect(_targetWindowHandle, out var rect))
-                        {
-                            int centerX = rect.Left + rect.Width / 2;
-                            int centerY = GetTitleBarClickY(rect, _targetWindowHandle);
+                            // Simulate a click in the horizontal center of the target window's title bar / top area
+                            if (NativeMethods.GetWindowRect(_targetWindowHandle, out var rect))
+                            {
+                                int centerX = rect.Left + rect.Width / 2;
+                                int centerY = GetTitleBarClickY(rect, _targetWindowHandle);
 
-                            // Save current cursor position
-                            NativeMethods.GetCursorPos(out var originalPos);
+                                // Save current cursor position
+                                NativeMethods.GetCursorPos(out var originalPos);
 
-                            // Move cursor and click
-                            NativeMethods.SetCursorPos(centerX, centerY);
-                            NativeMethods.mouse_event(NativeMethods.MOUSEEVENTF_LEFTDOWN, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
-                            NativeMethods.mouse_event(NativeMethods.MOUSEEVENTF_LEFTUP, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
+                                // Move cursor and click
+                                NativeMethods.SetCursorPos(centerX, centerY);
+                                NativeMethods.SendMouseEvent(NativeMethods.MOUSEEVENTF_LEFTDOWN, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
+                                NativeMethods.SendMouseEvent(NativeMethods.MOUSEEVENTF_LEFTUP, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
 
-                            // Restore cursor
-                            NativeMethods.SetCursorPos(originalPos.X, originalPos.Y);
-                        }
+                                // Restore cursor
+                                NativeMethods.SetCursorPos(originalPos.X, originalPos.Y);
+                            }
 
-                        // If we made it topmost earlier, unset topmost
-                        if (!wasTopMost && madeTopMost)
-                        {
+                            // unset topmost - if it was already topmost this will break that, but otherwise a window can become
+                            // 'trapped' as topmost, causing issues
                             NativeMethods.SetWindowPos(_targetWindowHandle, NativeMethods.HWND_NOTOPMOST, 0, 0, 0, 0,
                                 NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
+                        }
+                        else
+                        {
+                            // just try to set foreground the traditional way, which might fail due to OS restrictions
+                            NativeMethods.SetForegroundWindow(_targetWindowHandle);
                         }
 
                         _focusLost = false;
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         // Swallow exceptions to avoid crashing timer thread, but log to the debug output
-                        Debug.WriteLine("FocusPullerService: Exception occurred while trying to refocus target window.");
+                        Debug.WriteLine($"FocusPullerService: Exception occurred while trying to refocus target window. {ex}");
                     }
                 }
             }
