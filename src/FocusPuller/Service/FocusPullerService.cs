@@ -1,6 +1,7 @@
-using System.Runtime.InteropServices;
-using System.Windows.Threading;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace FocusPuller;
 
@@ -13,19 +14,26 @@ public class FocusPullerService
     private bool _isEnabled;
     private DateTime _lastFocusLostTime;
     private bool _focusLost;
+    private IntPtr _mainWindowHandle;
 
     public event EventHandler TargetWindowClosed;
 
-    public FocusPullerService(WindowFinder windowFinder)
+    public FocusPullerService(WindowFinder windowFinder, IntPtr mainWindowHandle)
     {
         _windowFinder = windowFinder;
-    }
+        _mainWindowHandle = mainWindowHandle;
+
+        HwndSource source = HwndSource.FromHwnd(mainWindowHandle);
+        source?.AddHook(WndProc);
+     }
 
     public bool IsRunning => _isEnabled;
     public IntPtr TargetHandle => _targetWindowHandle;
 
     public void Start(int refocusDelayInMilliseconds)
     {
+        RegisterHotKey();
+
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
         _isEnabled = true;
         _focusLost = false;
@@ -38,6 +46,8 @@ public class FocusPullerService
 
     public void Stop()
     {
+        UnregisterHotKey();
+
         _isEnabled = false;
         _targetWindowHandle = IntPtr.Zero;
         _timer?.Stop();
@@ -49,25 +59,31 @@ public class FocusPullerService
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
     }
 
-    public void RegisterHotKeyTo(IntPtr handle)
+    public void RegisterHotKey()
     {
         const int MOD_CONTROL = 0x0002;
         const int MOD_ALT = 0x0001;
         const int MOD_SHIFT = 0x0004;
         const int VK_0 = 0x30; // '0' key
         const int HOTKEY_ID = 1;
-        NativeMethods.RegisterHotKey(handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT | MOD_SHIFT, VK_0);
+        NativeMethods.RegisterHotKey(_mainWindowHandle, HOTKEY_ID, MOD_CONTROL | MOD_ALT | MOD_SHIFT, VK_0);
     }
 
-    public void UnregisterHotKeyFrom(IntPtr handle)
+    public void UnregisterHotKey()
     {
         const int HOTKEY_ID = 1;
-        NativeMethods.UnregisterHotKey(handle, HOTKEY_ID);
+        NativeMethods.UnregisterHotKey(_mainWindowHandle, HOTKEY_ID);
     }
 
-    public void NotifyHotKeyPressed()
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        BringTargetToForeground();
+        if (msg == NativeMethods.WM_HOTKEY)
+        {
+            BringTargetToForeground();
+            handled = true;
+        }
+
+        return IntPtr.Zero;
     }
 
     private void Timer_Tick(object sender, EventArgs e)

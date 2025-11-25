@@ -24,23 +24,6 @@ public partial class MainWindow : Window
         try
         {
             _settings = new Settings();
-
-            _windowFinder = new WindowFinder(_settings);
-
-            _focusPullerService = new FocusPullerService(_windowFinder);
-            _focusPullerService.TargetWindowClosed += FocusPullerService_TargetWindowClosed;
-
-            _windowCheckTimer = new System.Windows.Threading.DispatcherTimer();
-            _windowCheckTimer.Interval = TimeSpan.FromMilliseconds(500);
-            _windowCheckTimer.Tick += WindowCheckTimer_Tick;
-            _windowCheckTimer.Start();
-
-            Initialise();
-
-            if (_settings.Values.IsHideMode)
-            {
-                StartRefocusing();
-            }
         }
         catch (Exception ex)
         {
@@ -53,25 +36,30 @@ public partial class MainWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        
-        // Add hook to handle window messages
-        IntPtr handle = new WindowInteropHelper(this).Handle;
-        HwndSource source = HwndSource.FromHwnd(handle);
-        source?.AddHook(WndProc);
 
-        _focusPullerService.RegisterHotKeyTo(handle);
-    }
+        _windowFinder = new WindowFinder(_settings);
 
-    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        if (msg == NativeMethods.WM_HOTKEY)
+        _focusPullerService = new FocusPullerService(_windowFinder, new WindowInteropHelper(this).Handle);
+        _focusPullerService.TargetWindowClosed += FocusPullerService_TargetWindowClosed;
+
+        _targetWindow = _windowFinder.FindTargetWindow();
+        WindowStatusLabel.Text = _targetWindow?.Title ?? "No target window available";
+
+        _windowCheckTimer = new System.Windows.Threading.DispatcherTimer();
+        _windowCheckTimer.Interval = TimeSpan.FromMilliseconds(500);
+        _windowCheckTimer.Tick += WindowCheckTimer_Tick;
+        _windowCheckTimer.Start();
+
+        DelaySlider.Value = _settings.Values.RefocusDelayInMilliseconds;
+        HideModeCheckBox.IsChecked = _settings.Values.IsHideMode;
+        _isRefocusing = HideModeCheckBox.IsChecked ?? false; // switch on if Hide Mode is enabled
+
+        UpdateRefocusingButton();
+
+        if (_settings.Values.IsHideMode)
         {
-            int hotkeyId = wParam.ToInt32();
-            _focusPullerService.NotifyHotKeyPressed();
-            handled = true;
+            StartRefocusing();
         }
-        
-        return IntPtr.Zero;
     }
 
     public void RestoreFromTray()
@@ -79,18 +67,6 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
-    }
-
-    private void Initialise()
-    {
-        DelaySlider.Value = _settings.Values.RefocusDelayInMilliseconds;
-        HideModeCheckBox.IsChecked = _settings.Values.IsHideMode;
-        _isRefocusing = HideModeCheckBox.IsChecked ?? false; // switch on if Hide Mode is enabled
-
-        _targetWindow = _windowFinder.FindTargetWindow();
-        WindowStatusLabel.Text = _targetWindow?.Title ?? "No target window available";
-        
-        UpdateRefocusingButton();
     }
 
     private void SaveSettings()
@@ -361,7 +337,6 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object sender, CancelEventArgs e)
     {
-        _focusPullerService.UnregisterHotKeyFrom(new WindowInteropHelper(this).Handle);
         _windowCheckTimer?.Stop();
         _focusPullerService.Stop();
         SaveSettings();
