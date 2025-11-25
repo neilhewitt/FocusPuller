@@ -3,16 +3,6 @@ using System.Text.Json;
 
 namespace FocusPuller;
 
-public class SettingsValues
-{
-    public int RefocusDelayInMilliseconds { get; set; } = 5000;
-    public bool IsHideMode { get; set; } = false;
-    public string TargetWindowTitle { get; set; } = "";
-    public string TargetWindowClassName { get; set; } = "";
-    public bool AllowOnlyRuleDefinedWindows { get; set; } = false;
-    public List<WindowFinderRule> MatchingRules { get; set; } = new List<WindowFinderRule>();
-}
-
 public class Settings
 {
     public const string SETTINGS_FILENAME = "settings.json";
@@ -39,13 +29,14 @@ public class Settings
 
         _settingsPath = Path.Combine(_settingsFolder, SETTINGS_FILENAME);
         Load();
+        ValidateSettings();
     }
 
     public void Save()
     {
         try
         {
-            var options = new JsonSerializerOptions { WriteIndented = true };
+            var options = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
             var json = JsonSerializer.Serialize(Values, options);
             File.WriteAllText(_settingsPath, json);
         }
@@ -90,6 +81,17 @@ public class Settings
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load default rules: {ex.Message}");
+        }
+    }
+
+    private void ValidateSettings()
+    {
+        // Ensure hotkey configuration is valid - reset to defaults if not
+        if (!Values.HasValidHotkey())
+        {
+            System.Diagnostics.Debug.WriteLine("Invalid hotkey configuration detected. Resetting to defaults.");
+            Values.HotKeyCombination = "CTRL+ALT+SHIFT+0";
+            Save();
         }
     }
 }

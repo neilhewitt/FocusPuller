@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows.Automation.Text;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
@@ -8,6 +9,7 @@ namespace FocusPuller;
 public class FocusPullerService
 {
     private WindowFinder _windowFinder;
+    private Settings _settings;
     private DispatcherTimer _timer;
     private IntPtr _targetWindowHandle;
     private int _refocusDelayInMilliseconds;
@@ -15,12 +17,14 @@ public class FocusPullerService
     private DateTime _lastFocusLostTime;
     private bool _focusLost;
     private IntPtr _mainWindowHandle;
+    private const int HOTKEY_ID = 1;
 
     public event EventHandler TargetWindowClosed;
 
-    public FocusPullerService(WindowFinder windowFinder, IntPtr mainWindowHandle)
+    public FocusPullerService(WindowFinder windowFinder, Settings settings, IntPtr mainWindowHandle)
     {
         _windowFinder = windowFinder;
+        _settings = settings;
         _mainWindowHandle = mainWindowHandle;
 
         HwndSource source = HwndSource.FromHwnd(mainWindowHandle);
@@ -59,19 +63,33 @@ public class FocusPullerService
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
     }
 
-    public void RegisterHotKey()
+    public void UpdateHotkey()
     {
-        const int MOD_CONTROL = 0x0002;
-        const int MOD_ALT = 0x0001;
-        const int MOD_SHIFT = 0x0004;
-        const int VK_0 = 0x30; // '0' key
-        const int HOTKEY_ID = 1;
-        NativeMethods.RegisterHotKey(_mainWindowHandle, HOTKEY_ID, MOD_CONTROL | MOD_ALT | MOD_SHIFT, VK_0);
+        // Re-register the hotkey with new settings
+        UnregisterHotKey();
+        RegisterHotKey();
     }
 
-    public void UnregisterHotKey()
+    private void RegisterHotKey()
     {
-        const int HOTKEY_ID = 1;
+        if (!_settings.Values.HasValidHotkey())
+        {
+            Debug.WriteLine("Cannot register hotkey: invalid configuration");
+            return;
+        }
+
+        (_, _, _, uint modifiers, uint vk, _) = _settings.Values.GetHotkeyInfo();        
+        bool success = NativeMethods.RegisterHotKey(_mainWindowHandle, HOTKEY_ID, modifiers, vk);
+        
+        if (!success)
+        {
+            int error = Marshal.GetLastWin32Error();
+            Debug.WriteLine($"Failed to register hotkey. Error: {error}");
+        }
+    }
+
+    private void UnregisterHotKey()
+    {
         NativeMethods.UnregisterHotKey(_mainWindowHandle, HOTKEY_ID);
     }
 
@@ -164,51 +182,55 @@ public class FocusPullerService
 
     private void TriggerHotkey()
     {
-        const ushort VK_CONTROL = 0x11;
-        const ushort VK_MENU = 0x12;    // ALT key
-        const ushort VK_SHIFT = 0x10;
-        const ushort VK_0 = 0x30;       // '0' key
+        ushort controlKey = (ushort)VirtualKey.ControlKey;
+        ushort altKey = (ushort)VirtualKey.AltKey;
+        ushort shiftKey = (ushort)VirtualKey.ShiftKey;
 
-        var inputs = new NativeMethods.INPUT[8];
+        var hotkeyInfo = _settings.Values.GetHotkeyInfo();
 
-        NativeMethods.INPUT MakeInput(ushort vk, uint flags = 0)
+        var inputCount = 0;
+        var inputs = new NativeMethods.INPUT[hotkeyInfo.keyCount * 2]; // Max needed: 4 down + 4 up
+
+        // press modifier keys in order
+        AddInput(hotkeyInfo.useControl, controlKey);
+        AddInput(hotkeyInfo.useAlt, altKey);
+        AddInput(hotkeyInfo.useShift, shiftKey);
+        AddInput(true, (ushort)hotkeyInfo.virtualKeyCode);
+
+        // release keys in reverse order
+        AddInput(true, (ushort)hotkeyInfo.virtualKeyCode, NativeMethods.KEYEVENTF_KEYUP);
+        AddInput(hotkeyInfo.useShift, shiftKey, NativeMethods.KEYEVENTF_KEYUP);
+        AddInput(hotkeyInfo.useAlt, altKey, NativeMethods.KEYEVENTF_KEYUP);
+        AddInput(hotkeyInfo.useControl, controlKey, NativeMethods.KEYEVENTF_KEYUP);
+
+        uint result = NativeMethods.SendInput((uint)inputCount, inputs, Marshal.SizeOf(typeof(NativeMethods.INPUT)));
+
+        if (result != inputCount)
         {
-            return new NativeMethods.INPUT
-            {
-                type = NativeMethods.INPUT_KEYBOARD,
-                u = new NativeMethods.InputUnion
-                {
-                    ki = new NativeMethods.KEYBDINPUT
-                    {
-                        wVk = vk,
-                        wScan = 0,
-                        dwFlags = flags,
-                        time = 0,
-                        dwExtraInfo = IntPtr.Zero
-                    }
-                }
-            };
+            int error = Marshal.GetLastWin32Error();
+            Debug.WriteLine($"SendInput failed. Sent {result} of {inputCount} inputs. Error: {error}");
         }
 
-        // keys down
-        inputs[0] = MakeInput(VK_CONTROL);
-        inputs[1] = MakeInput(VK_MENU);
-        inputs[2] = MakeInput(VK_SHIFT);
-        inputs[3] = MakeInput(VK_0);
-
-        // keys up
-        inputs[4] = MakeInput(VK_0, NativeMethods.KEYEVENTF_KEYUP);
-        inputs[5] = MakeInput(VK_SHIFT, NativeMethods.KEYEVENTF_KEYUP);
-        inputs[6] = MakeInput(VK_MENU, NativeMethods.KEYEVENTF_KEYUP);
-        inputs[7] = MakeInput(VK_CONTROL, NativeMethods.KEYEVENTF_KEYUP);
-
-        uint result = NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeMethods.INPUT)));
-
-        if (result != inputs.Length)
+        void AddInput(bool add, ushort vk, uint flags = 0)
         {
-            // Handle error if needed
-            int error = Marshal.GetLastWin32Error();
-            System.Diagnostics.Debug.WriteLine($"SendInput failed. Sent {result} of {inputs.Length} inputs. Error: {error}");
+            if (add)
+            {
+                inputs[inputCount++] = new NativeMethods.INPUT
+                {
+                    type = NativeMethods.INPUT_KEYBOARD,
+                    u = new NativeMethods.InputUnion
+                    {
+                        ki = new NativeMethods.KEYBDINPUT
+                        {
+                            wVk = vk,
+                            wScan = 0,
+                            dwFlags = flags,
+                            time = 0,
+                            dwExtraInfo = IntPtr.Zero
+                        }
+                    }
+                };
+            }
         }
     }
 

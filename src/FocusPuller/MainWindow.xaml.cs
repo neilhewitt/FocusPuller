@@ -39,7 +39,7 @@ public partial class MainWindow : Window
 
         _windowFinder = new WindowFinder(_settings);
 
-        _focusPullerService = new FocusPullerService(_windowFinder, new WindowInteropHelper(this).Handle);
+        _focusPullerService = new FocusPullerService(_windowFinder, _settings, new WindowInteropHelper(this).Handle);
         _focusPullerService.TargetWindowClosed += FocusPullerService_TargetWindowClosed;
 
         _targetWindow = _windowFinder.FindTargetWindow();
