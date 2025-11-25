@@ -59,6 +59,12 @@ public class FocusPullerService
         NativeMethods.RegisterHotKey(handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT | MOD_SHIFT, VK_0);
     }
 
+    public void UnregisterHotKeyFrom(IntPtr handle)
+    {
+        const int HOTKEY_ID = 1;
+        NativeMethods.UnregisterHotKey(handle, HOTKEY_ID);
+    }
+
     public void NotifyHotKeyPressed()
     {
         BringTargetToForeground();

@@ -361,7 +361,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object sender, CancelEventArgs e)
     {
-        // Stop background timers and services
+        _focusPullerService.UnregisterHotKeyFrom(new WindowInteropHelper(this).Handle);
         _windowCheckTimer?.Stop();
         _focusPullerService.Stop();
         SaveSettings();

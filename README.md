@@ -93,7 +93,7 @@ src/FocusPuller/bin/Debug/net9.0-windows/FocusPuller.exe
 
 Because Windows has anti-focus-stealing measures, refocusing may not work in some scenarios, especially if the user has recently interacted with other applications. You may see the target app icon flash in the taskbar when refocusing is attempted but blocked.
 
-The app uses a non-standard approach to bringing the target window to the foreground, which involves temporarily setting the target window to always-on-top and then simulating a mouse click on it to give it the focus. The window is then set back to normal z-ordering if it wasn't already always-on-top. On rare occasions, the app may remain stuck in always-on-top mode and will need to be terminated and restarted to fix this.
+The app uses a non-standard approach to bringing the target window to the foreground, which involves registering a global hotkey when the app starts (CTRL+SHIFT+ALT+0 - I may make this configurable) and then sending ourselves that hotkey which forces Windows to allow the focus change.
 
 This approach is tested to work with Microsoft Flight Simulator 2024/2020 on Windows 11 25H2, but may not work with all applications, and may be affected by future simulator updates or Windows system updates.
 
