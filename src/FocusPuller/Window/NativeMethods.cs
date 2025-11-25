@@ -28,13 +28,6 @@ public static class NativeMethods
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct POINT
-    {
-        public int X;
-        public int Y;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
     public struct INPUT
     {
         public uint type;
