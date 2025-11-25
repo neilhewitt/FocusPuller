@@ -49,6 +49,21 @@ public class FocusPullerService
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
     }
 
+    public void RegisterHotKeyTo(IntPtr handle)
+    {
+        const int MOD_CONTROL = 0x0002;
+        const int MOD_ALT = 0x0001;
+        const int MOD_SHIFT = 0x0004;
+        const int VK_0 = 0x30; // '0' key
+        const int HOTKEY_ID = 1;
+        NativeMethods.RegisterHotKey(handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT | MOD_SHIFT, VK_0);
+    }
+
+    public void NotifyHotKeyPressed()
+    {
+        BringTargetToForeground();
+    }
+
     private void Timer_Tick(object sender, EventArgs e)
     {
         if (!_isEnabled)
@@ -95,52 +110,11 @@ public class FocusPullerService
 
                 if (timeSinceFocusLost >= _refocusDelayInMilliseconds && idleTime >= _refocusDelayInMilliseconds)
                 {
-                    try
-                    {
-                        // Restore target window (in case minimized)
-                        NativeMethods.ShowWindow(_targetWindowHandle, NativeMethods.SW_RESTORE);
-
-                        // set it topmost temporarily to force focus
-                        if (NativeMethods.SetWindowPos(_targetWindowHandle, NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
-                                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE))
-                        {
-
-                            // Simulate a click in the horizontal center of the target window's title bar / top area
-                            if (NativeMethods.GetWindowRect(_targetWindowHandle, out var rect))
-                            {
-                                int centerX = rect.Left + rect.Width / 2;
-                                int centerY = GetTitleBarClickY(rect, _targetWindowHandle);
-
-                                // Save current cursor position
-                                NativeMethods.GetCursorPos(out var originalPos);
-
-                                // Move cursor and click
-                                NativeMethods.SetCursorPos(centerX, centerY);
-                                NativeMethods.SendMouseEvent(NativeMethods.MOUSEEVENTF_LEFTDOWN, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
-                                NativeMethods.SendMouseEvent(NativeMethods.MOUSEEVENTF_LEFTUP, (uint)centerX, (uint)centerY, 0, UIntPtr.Zero);
-
-                                // Restore cursor
-                                NativeMethods.SetCursorPos(originalPos.X, originalPos.Y);
-                            }
-
-                            // unset topmost - if it was already topmost this will break that, but otherwise a window can become
-                            // 'trapped' as topmost, causing issues
-                            NativeMethods.SetWindowPos(_targetWindowHandle, NativeMethods.HWND_NOTOPMOST, 0, 0, 0, 0,
-                                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
-                        }
-                        else
-                        {
-                            // just try to set foreground the traditional way, which might fail due to OS restrictions
-                            NativeMethods.SetForegroundWindow(_targetWindowHandle);
-                        }
-
-                        _focusLost = false;
-                    }
-                    catch (Exception ex)
-                    {
-                        // Swallow exceptions to avoid crashing timer thread, but log to the debug output
-                        Debug.WriteLine($"FocusPullerService: Exception occurred while trying to refocus target window. {ex}");
-                    }
+                    // we will trigger the hotkey - this will then send back the WM_HOTKEY message which is picked up by the main window and
+                    // sent back to us via NotifyHotKeyPressed, which then triggers the BringTargetToForeground method
+                    // this gets around the focus-stealing measures in Windows (for now)
+                    TriggerHotkey();
+                    _focusLost = false;
                 }
             }
         }
@@ -148,6 +122,71 @@ public class FocusPullerService
         {
             // Target window has focus
             _focusLost = false;
+        }
+    }
+
+    private void BringTargetToForeground()
+    {
+        if (_isEnabled && _targetWindowHandle != IntPtr.Zero)
+        {
+            try
+            {
+                NativeMethods.SetForegroundWindow(_targetWindowHandle);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"FocusPullerService: Exception occurred while handling hotkey invocation. {ex}");
+            }
+        }
+    }
+
+    private void TriggerHotkey()
+    {
+        const ushort VK_CONTROL = 0x11;
+        const ushort VK_MENU = 0x12;    // ALT key
+        const ushort VK_SHIFT = 0x10;
+        const ushort VK_0 = 0x30;       // '0' key
+
+        var inputs = new NativeMethods.INPUT[8];
+
+        NativeMethods.INPUT MakeInput(ushort vk, uint flags = 0)
+        {
+            return new NativeMethods.INPUT
+            {
+                type = NativeMethods.INPUT_KEYBOARD,
+                u = new NativeMethods.InputUnion
+                {
+                    ki = new NativeMethods.KEYBDINPUT
+                    {
+                        wVk = vk,
+                        wScan = 0,
+                        dwFlags = flags,
+                        time = 0,
+                        dwExtraInfo = IntPtr.Zero
+                    }
+                }
+            };
+        }
+
+        // keys down
+        inputs[0] = MakeInput(VK_CONTROL);
+        inputs[1] = MakeInput(VK_MENU);
+        inputs[2] = MakeInput(VK_SHIFT);
+        inputs[3] = MakeInput(VK_0);
+
+        // keys up
+        inputs[4] = MakeInput(VK_0, NativeMethods.KEYEVENTF_KEYUP);
+        inputs[5] = MakeInput(VK_SHIFT, NativeMethods.KEYEVENTF_KEYUP);
+        inputs[6] = MakeInput(VK_MENU, NativeMethods.KEYEVENTF_KEYUP);
+        inputs[7] = MakeInput(VK_CONTROL, NativeMethods.KEYEVENTF_KEYUP);
+
+        uint result = NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeMethods.INPUT)));
+
+        if (result != inputs.Length)
+        {
+            // Handle error if needed
+            int error = Marshal.GetLastWin32Error();
+            System.Diagnostics.Debug.WriteLine($"SendInput failed. Sent {result} of {inputs.Length} inputs. Error: {error}");
         }
     }
 
@@ -163,38 +202,5 @@ public class FocusPullerService
         }
 
         return 0;
-    }
-
-    private int GetTitleBarClickY(NativeMethods.RECT rect, IntPtr hWnd)
-    {
-        // Default fallback: click 1/12th down from top or at least 8px
-        int fallback = rect.Top + Math.Max(8, rect.Height / 12);
-
-        try
-        {
-            // Determine if window style includes a caption/title bar
-            var stylePtr = NativeMethods.GetWindowLongPtr(hWnd, NativeMethods.GWL_STYLE);
-            bool hasCaption = (stylePtr.ToInt64() & NativeMethods.WS_CAPTION) != 0;
-
-            int captionHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYCAPTION);
-            int frameHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYFRAME);
-
-            if (hasCaption)
-            {
-                // Titlebar height includes caption + frame
-                int titleBarHeight = captionHeight + frameHeight;
-                return rect.Top + titleBarHeight / 2;
-            }
-            else
-            {
-                // No caption - click near the top edge within a small area
-                int topArea = Math.Max(8, Math.Min(rect.Height / 12, 48));
-                return rect.Top + topArea / 2;
-            }
-        }
-        catch
-        {
-            return fallback;
-        }
     }
 }

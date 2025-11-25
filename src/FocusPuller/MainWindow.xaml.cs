@@ -1,6 +1,8 @@
 ﻿using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace FocusPuller;
@@ -21,7 +23,6 @@ public partial class MainWindow : Window
 
         try
         {
-
             _settings = new Settings();
 
             _windowFinder = new WindowFinder(_settings);
@@ -47,6 +48,30 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Application.Current.Shutdown();
         }
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        
+        // Add hook to handle window messages
+        IntPtr handle = new WindowInteropHelper(this).Handle;
+        HwndSource source = HwndSource.FromHwnd(handle);
+        source?.AddHook(WndProc);
+
+        _focusPullerService.RegisterHotKeyTo(handle);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == NativeMethods.WM_HOTKEY)
+        {
+            int hotkeyId = wParam.ToInt32();
+            _focusPullerService.NotifyHotKeyPressed();
+            handled = true;
+        }
+        
+        return IntPtr.Zero;
     }
 
     public void RestoreFromTray()
