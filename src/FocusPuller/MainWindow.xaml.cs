@@ -187,7 +187,7 @@ public partial class MainWindow : Window
                 SaveSettings();
             }
             
-            if (_settings.Values.IsHideMode && !_isRefocusing)
+            if (_settings.Values.IsHideMode && this.WindowState == WindowState.Minimized && !_isRefocusing)
             {
                 StartRefocusing();
             }
