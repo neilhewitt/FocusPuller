@@ -2,6 +2,8 @@
 
 A Windows WPF application that automatically returns focus to a specified window after a defined period of inactivity.
 
+To avoid Windows anti-focus-stealing features, the app uses a non-standard approach to bringing the target window to the foreground, which involves registering a global hotkey when the app starts and then sending ourselves that hotkey which forces Windows to allow the focus change.
+
 ## Features
 
 - **Auto-Refocus**: Automatically brings a target window back to focus after keyboard/mouse/touch inactivity
@@ -16,14 +18,23 @@ The default rule set is configured to target Flight Simulator, but you can chang
 
 ## Window targeting rules
 
-The default rules are stored in `defaultrules.json` which will be found alongside the executable.
-
-If you want to customize the rules, edit the file before first run. After first run, the rules are saved to the `settings.json` file and you can change them again there if you need to.
-
-The rules file is a JSON array of objects with the following properties:
+The default rules are stored in `defaultrules.json` which will be found alongside the executable. The rules file is a JSON array of objects with the following properties:
 
 - **ClassName**: The class name of the window to match - case sensitive, exact match
 - One or more **TitlePrefixes**: An array of title prefixes to match (for example, one for MSFS 2024 and one for MSFS 2020)
+
+`[
+    {
+      "ClassName": "AceApp",
+      "TitlePrefixes": [
+        "Microsoft Flight Simulator 2024 -",
+        "Microsoft Flight Simulator 2020 -",
+        "Microsoft Flight Simulator -"
+      ]
+    }
+]`
+
+If you want to customize the rules permanently, edit this file before first run. After first run, the rules in use are saved to the `settings.json` file and you can change them there if you need to.
 
 Title matching is case sensitive and partial - the actual window title only needs to *start* with one of the prefixes. This allows for dynamic titles that may include version numbers or other changing information, which is the case for Microsoft Flight Simulator.
 
@@ -96,9 +107,7 @@ src/FocusPuller/bin/Debug/net9.0-windows/FocusPuller.exe
 
 Because Windows has anti-focus-stealing measures, refocusing may not work in some scenarios, especially if the user has recently interacted with other applications. You may see the target app icon flash in the taskbar when refocusing is attempted but blocked.
 
-The app uses a non-standard approach to bringing the target window to the foreground, which involves registering a global hotkey when the app starts and then sending ourselves that hotkey which forces Windows to allow the focus change.
-
-This approach is tested to work with Microsoft Flight Simulator 2024/2020 on Windows 11 25H2, but may not work with all applications, and may be affected by future simulator updates or Windows system updates.
+The app uses a non-standard approach to bringing the target window to the foreground. This approach is tested to work with Microsoft Flight Simulator 2024/2020 on Windows 11 25H2, but may not work with all applications, and may be affected by future simulator updates or Windows system updates.
 
 ## Notes
 
