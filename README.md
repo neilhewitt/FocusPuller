@@ -47,7 +47,7 @@ Title matching is case sensitive and partial - the actual window title only need
    - FocusPuller should notice and start tracking it
 
 3. **Set Refocus Delay**
-   - Use the slider to adjust the delay (1000-30000 milliseconds) or type directly into the box + ENTER
+   - Use the slider to adjust the delay (100-30000 milliseconds) or type directly into the box + ENTER
    - This is how long the app waits after the last user input before refocusing
 
 4. **Enable Refocusing**
