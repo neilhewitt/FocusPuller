@@ -100,8 +100,9 @@ dotnet run --project src/FocusPuller/FocusPuller.csproj
 
 Or run the compiled executable from:
 ```
-src/FocusPuller/bin/Debug/net9.0-windows/FocusPuller.exe
+src/FocusPuller/bin/Debug|Release/net10.0-windows/FocusPuller.exe
 ```
+(use Debug or Release depending on which version you built).
 
 ## Known Issues
 
