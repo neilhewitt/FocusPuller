@@ -12,7 +12,7 @@ public class WindowFinder
 
     public WindowFinder(Settings settings)
     {
-        Rules = settings.Values.MatchingRules ?? InitialiseDefaultRules();
+        Rules = settings.Values.WindowFinderRules ?? InitialiseDefaultRules();
     }
 
     public WindowInfo FindTargetWindow()
@@ -63,15 +63,15 @@ public class WindowFinder
     {
         var windows = new List<WindowInfo>();
 
-        NativeMethods.EnumWindows((hWnd, lParam) =>
+        Native.EnumWindows((hWnd, lParam) =>
         {
-            if (NativeMethods.IsWindowVisible(hWnd))
+            if (Native.IsWindowVisible(hWnd))
             {
                 var titleBuilder = new StringBuilder(256);
                 var classBuilder = new StringBuilder(256);
 
-                NativeMethods.GetWindowText(hWnd, titleBuilder, titleBuilder.Capacity);
-                NativeMethods.GetClassName(hWnd, classBuilder, classBuilder.Capacity);
+                Native.GetWindowText(hWnd, titleBuilder, titleBuilder.Capacity);
+                Native.GetClassName(hWnd, classBuilder, classBuilder.Capacity);
 
                 var title = titleBuilder.ToString();
                 var className = classBuilder.ToString();

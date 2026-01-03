@@ -63,7 +63,7 @@ public class Settings
 
         try
         {
-            if (Values.MatchingRules?.Count == 0)
+            if (Values.WindowFinderRules?.Count == 0)
             {
                 // Look for defaultrules.json
                 var appRulesPath = Path.Combine(AppContext.BaseDirectory, RULES_FILENAME);
@@ -73,7 +73,7 @@ public class Settings
                     var rulesData = JsonSerializer.Deserialize<List<WindowFinderRule>>(rulesJson);
                     if (rulesData != null && rulesData.Count > 0)
                     {
-                        Values.MatchingRules = rulesData;
+                        Values.WindowFinderRules = rulesData;
                     }
                 }
             }

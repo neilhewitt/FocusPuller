@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private bool _isRefocusing = false;
     private bool _refocusingDisabled = false;
     private System.Windows.Threading.DispatcherTimer _windowCheckTimer;
+    private bool _sendingHotKeyInProgress = false;
 
     public MainWindow()
     {
@@ -73,7 +74,7 @@ public partial class MainWindow : Window
     {
         _settings.Values.RefocusDelayInMilliseconds = (int)DelaySlider.Value;
         _settings.Values.IsHideMode = HideModeCheckBox.IsChecked ?? false;
-        _settings.Values.MatchingRules = _windowFinder.Rules;
+        _settings.Values.WindowFinderRules = _windowFinder.Rules;
 
         if (_targetWindow != null)
         {
@@ -154,46 +155,51 @@ public partial class MainWindow : Window
 
     private void UpdateWindowStatus()
     {
-        bool hasSavedTargetWindow = !string.IsNullOrWhiteSpace(_settings.Values.TargetWindowTitle);
-
-        // If no window is selected, clear the label
-        if (_targetWindow == null)
+        if (!_sendingHotKeyInProgress)
         {
-            _targetWindow = _windowFinder.FindTargetWindow();
-        }
+            bool hasSavedTargetWindow = !string.IsNullOrWhiteSpace(_settings.Values.TargetWindowTitle);
 
-        if (_targetWindow == null && !hasSavedTargetWindow)
-        {
-            WindowStatusLabel.Text = "No target window available yet";
-            WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
-        }
-        else if (!_windowFinder.IsVisible(_targetWindow))
-        {
-            WindowStatusLabel.Text = $"{_settings.Values.TargetWindowTitle.TrimEnd(' ', '-')} not available";
-            WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Red);
-
-            if (_isRefocusing)
+            if (_targetWindow == null)
             {
-                StopRefocusing();
+                _targetWindow = _windowFinder.FindTargetWindow();
             }
-        }
-        else
-        {
-            WindowStatusLabel.Text = _targetWindow.Title;
-            WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
-            
-            if (!hasSavedTargetWindow)
-            {
-                SaveSettings();
-            }
-            
-            if (_settings.Values.IsHideMode && this.WindowState == WindowState.Minimized && !_isRefocusing)
-            {
-                StartRefocusing();
-            }
-        }
 
-        UpdateRefocusingButton();
+            Dispatcher.Invoke(() =>
+            {
+                if (_targetWindow == null && !hasSavedTargetWindow)
+                {
+                    WindowStatusLabel.Text = "No target window available yet";
+                    WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
+                }
+                else if (!_windowFinder.IsVisible(_targetWindow))
+                {
+                    WindowStatusLabel.Text = $"{_settings.Values.TargetWindowTitle.TrimEnd(' ', '-')} not available";
+                    WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Red);
+
+                    if (_isRefocusing)
+                    {
+                        StopRefocusing();
+                    }
+                }
+                else
+                {
+                    WindowStatusLabel.Text = _targetWindow.Title;
+                    WindowStatusLabel.Foreground = new SolidColorBrush(Colors.Black);
+
+                    if (!hasSavedTargetWindow)
+                    {
+                        SaveSettings();
+                    }
+
+                    if (_settings.Values.IsHideMode && this.WindowState == WindowState.Minimized && !_isRefocusing)
+                    {
+                        StartRefocusing();
+                    }
+                }
+
+                UpdateRefocusingButton();
+            });
+        }
     }
 
     private void WindowCheckTimer_Tick(object sender, EventArgs e)

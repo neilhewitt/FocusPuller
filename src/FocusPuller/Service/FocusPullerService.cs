@@ -79,7 +79,7 @@ public class FocusPullerService
         }
 
         (_, _, _, uint modifiers, uint vk, _) = _settings.Values.GetHotkeyInfo();        
-        bool success = NativeMethods.RegisterHotKey(_mainWindowHandle, HOTKEY_ID, modifiers, vk);
+        bool success = Native.RegisterHotKey(_mainWindowHandle, HOTKEY_ID, modifiers, vk);
         
         if (!success)
         {
@@ -90,12 +90,12 @@ public class FocusPullerService
 
     private void UnregisterHotKey()
     {
-        NativeMethods.UnregisterHotKey(_mainWindowHandle, HOTKEY_ID);
+        Native.UnregisterHotKey(_mainWindowHandle, HOTKEY_ID);
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == NativeMethods.WM_HOTKEY)
+        if (msg == Native.WM_HOTKEY)
         {
             BringTargetToForeground();
             handled = true;
@@ -126,14 +126,14 @@ public class FocusPullerService
         }
 
         // Check if target window still exists
-        if (!NativeMethods.IsWindow(_targetWindowHandle))
+        if (!Native.IsWindow(_targetWindowHandle))
         {
             TargetWindowClosed?.Invoke(this, EventArgs.Empty);
             Stop();
             return;
         }
 
-        var foregroundWindow = NativeMethods.GetForegroundWindow();
+        var foregroundWindow = Native.GetForegroundWindow();
         if (foregroundWindow != _targetWindowHandle)
         {
             // Target window lost focus
@@ -171,7 +171,7 @@ public class FocusPullerService
         {
             try
             {
-                NativeMethods.SetForegroundWindow(_targetWindowHandle);
+                Native.SetForegroundWindow(_targetWindowHandle);
             }
             catch (Exception ex)
             {
@@ -189,7 +189,7 @@ public class FocusPullerService
         var hotkeyInfo = _settings.Values.GetHotkeyInfo();
 
         var inputCount = 0;
-        var inputs = new NativeMethods.INPUT[hotkeyInfo.keyCount * 2]; // Max needed: 4 down + 4 up
+        var inputs = new Native.INPUT[hotkeyInfo.keyCount * 2]; // Max needed: 4 down + 4 up
 
         // press modifier keys in order
         AddInput(hotkeyInfo.useControl, controlKey);
@@ -198,12 +198,12 @@ public class FocusPullerService
         AddInput(true, (ushort)hotkeyInfo.virtualKeyCode);
 
         // release keys in reverse order
-        AddInput(true, (ushort)hotkeyInfo.virtualKeyCode, NativeMethods.KEYEVENTF_KEYUP);
-        AddInput(hotkeyInfo.useShift, shiftKey, NativeMethods.KEYEVENTF_KEYUP);
-        AddInput(hotkeyInfo.useAlt, altKey, NativeMethods.KEYEVENTF_KEYUP);
-        AddInput(hotkeyInfo.useControl, controlKey, NativeMethods.KEYEVENTF_KEYUP);
+        AddInput(true, (ushort)hotkeyInfo.virtualKeyCode, Native.KEYEVENTF_KEYUP);
+        AddInput(hotkeyInfo.useShift, shiftKey, Native.KEYEVENTF_KEYUP);
+        AddInput(hotkeyInfo.useAlt, altKey, Native.KEYEVENTF_KEYUP);
+        AddInput(hotkeyInfo.useControl, controlKey, Native.KEYEVENTF_KEYUP);
 
-        uint result = NativeMethods.SendInput((uint)inputCount, inputs, Marshal.SizeOf(typeof(NativeMethods.INPUT)));
+        uint result = Native.SendInput((uint)inputCount, inputs, Marshal.SizeOf(typeof(Native.INPUT)));
 
         if (result != inputCount)
         {
@@ -215,12 +215,12 @@ public class FocusPullerService
         {
             if (add)
             {
-                inputs[inputCount++] = new NativeMethods.INPUT
+                inputs[inputCount++] = new Native.INPUT
                 {
-                    type = NativeMethods.INPUT_KEYBOARD,
-                    u = new NativeMethods.InputUnion
+                    type = Native.INPUT_KEYBOARD,
+                    u = new Native.InputUnion
                     {
-                        ki = new NativeMethods.KEYBDINPUT
+                        ki = new Native.KEYBDINPUT
                         {
                             wVk = vk,
                             wScan = 0,
@@ -236,12 +236,12 @@ public class FocusPullerService
 
     private uint GetIdleTime()
     {
-        var lastInputInfo = new NativeMethods.LASTINPUTINFO();
+        var lastInputInfo = new Native.LASTINPUTINFO();
         lastInputInfo.cbSize = (uint)Marshal.SizeOf(lastInputInfo);
 
-        if (NativeMethods.GetLastInputInfo(ref lastInputInfo))
+        if (Native.GetLastInputInfo(ref lastInputInfo))
         {
-            uint tick = NativeMethods.GetTickCount();
+            uint tick = Native.GetTickCount();
             return tick - lastInputInfo.dwTime;
         }
 

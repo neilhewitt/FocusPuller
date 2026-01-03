@@ -1,7 +1,7 @@
 ﻿<Window x:Class="FocusPuller.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FocusPuller" Height="340" Width="500"
+        Title="FocusPuller" Height="360" Width="500"
         ResizeMode="CanMinimize"
         Icon="pack://application:,,,/focuspuller.ico"
         Closing="Window_Closing"

@@ -3,7 +3,7 @@ using System.Text;
 
 namespace FocusPuller;
 
-public static class NativeMethods
+public static class Native
 {
     public const int WM_HOTKEY = 0x0312;
 
@@ -11,6 +11,7 @@ public static class NativeMethods
     public const uint MOD_ALT = 0x0001;
     public const uint MOD_CONTROL = 0x0002;
     public const uint MOD_SHIFT = 0x0004;
+    public const uint MOD_NOREPEAT = 0x4000;
 
     // Input types
     public const uint INPUT_KEYBOARD = 1;
@@ -113,6 +114,9 @@ public static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);

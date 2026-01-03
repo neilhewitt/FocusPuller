@@ -12,7 +12,7 @@ public class SettingsValues
     public string TargetWindowTitle { get; set; } = "";
     public string TargetWindowClassName { get; set; } = "";
     public bool AllowOnlyRuleDefinedWindows { get; set; } = false;
-    public List<WindowFinderRule> MatchingRules { get; set; } = new List<WindowFinderRule>();
+    public List<WindowFinderRule> WindowFinderRules { get; set; } = new List<WindowFinderRule>();
     
     public string HotKeyCombination
     {
@@ -86,13 +86,15 @@ public class SettingsValues
         uint modifiers = 0;
 
         if (_hotkeyUseControl)
-            modifiers |= NativeMethods.MOD_CONTROL;
+            modifiers |= Native.MOD_CONTROL;
 
         if (_hotkeyUseAlt)
-            modifiers |= NativeMethods.MOD_ALT;
+            modifiers |= Native.MOD_ALT;
 
         if (_hotkeyUseShift)
-            modifiers |= NativeMethods.MOD_SHIFT;
+            modifiers |= Native.MOD_SHIFT;
+
+        modifiers |= Native.MOD_NOREPEAT; // always needed
 
         return modifiers;
     }
