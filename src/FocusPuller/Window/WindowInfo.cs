@@ -1,11 +1,12 @@
 using System.ComponentModel;
+using System.Text;
 
 namespace FocusPuller;
 
 public class WindowInfo
 {
     public IntPtr Handle { get; set; }
-    
+
     public string Title { get; set; }
     public string ClassName { get; set; }
     public string DisplayName => $"{Title} [{ClassName}]";

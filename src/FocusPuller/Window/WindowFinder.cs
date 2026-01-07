@@ -8,6 +8,36 @@ namespace FocusPuller;
 
 public class WindowFinder
 {
+    public static IReadOnlyList<WindowInfo> GetVisibleWindows()
+    {
+        var windows = new List<WindowInfo>();
+
+        Native.EnumWindows((hWnd, lParam) =>
+        {
+            if (Native.IsWindowVisible(hWnd))
+            {
+                var titleBuilder = new StringBuilder(256);
+                var classBuilder = new StringBuilder(256);
+
+                Native.GetWindowText(hWnd, titleBuilder, titleBuilder.Capacity);
+                Native.GetClassName(hWnd, classBuilder, classBuilder.Capacity);
+
+                var title = titleBuilder.ToString();
+                var className = classBuilder.ToString();
+
+                // Only include windows with titles
+                if (!string.IsNullOrWhiteSpace(title))
+                {
+                    windows.Add(new WindowInfo(hWnd, title, className));
+                }
+            }
+
+            return true;
+        }, IntPtr.Zero);
+
+        return windows.AsReadOnly();
+    }
+
     public List<WindowFinderRule> Rules { get; init; }
 
     public WindowFinder(Settings settings)
@@ -47,47 +77,6 @@ public class WindowFinder
         return null;
     }
 
-
-    public bool IsVisible(WindowInfo windowInfo)
-    {
-        if (windowInfo == null)
-        {
-            return false;
-        }
-
-        var windows = GetVisibleWindows();
-        return windows.Any(w => w.ClassName == windowInfo.ClassName && w.Title == windowInfo.Title);
-    }
-
-    private List<WindowInfo> GetVisibleWindows()
-    {
-        var windows = new List<WindowInfo>();
-
-        Native.EnumWindows((hWnd, lParam) =>
-        {
-            if (Native.IsWindowVisible(hWnd))
-            {
-                var titleBuilder = new StringBuilder(256);
-                var classBuilder = new StringBuilder(256);
-
-                Native.GetWindowText(hWnd, titleBuilder, titleBuilder.Capacity);
-                Native.GetClassName(hWnd, classBuilder, classBuilder.Capacity);
-
-                var title = titleBuilder.ToString();
-                var className = classBuilder.ToString();
-
-                // Only include windows with titles
-                if (!string.IsNullOrWhiteSpace(title))
-                {
-                    windows.Add(new WindowInfo(hWnd, title, className));
-                }
-            }
-
-            return true;
-        }, IntPtr.Zero);
-
-        return windows;
-    }
 
     private List<WindowFinderRule> InitialiseDefaultRules()
     {

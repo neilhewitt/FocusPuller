@@ -12,14 +12,19 @@ public class FocusPullerService
     private Settings _settings;
     private DispatcherTimer _timer;
     private IntPtr _targetWindowHandle;
+    private WindowInfo _targetWindow;
     private int _refocusDelayInMilliseconds;
-    private bool _isEnabled;
     private DateTime _lastFocusLostTime;
     private bool _focusLost;
     private IntPtr _mainWindowHandle;
     private const int HOTKEY_ID = 1;
 
+    private bool _refocusing;
+
     public event EventHandler TargetWindowClosed;
+    public event EventHandler<WindowInfo> TargetWindowCreated;
+
+    public WindowInfo TargetWindow => _targetWindow;
 
     public FocusPullerService(WindowFinder windowFinder, Settings settings, IntPtr mainWindowHandle)
     {
@@ -31,17 +36,15 @@ public class FocusPullerService
         source?.AddHook(WndProc);
      }
 
-    public bool IsRunning => _isEnabled;
-    public IntPtr TargetHandle => _targetWindowHandle;
-
     public void Start(int refocusDelayInMilliseconds)
     {
         RegisterHotKey();
 
         _refocusDelayInMilliseconds = refocusDelayInMilliseconds;
-        _isEnabled = true;
         _focusLost = false;
-        
+
+        Timer_Tick(this, EventArgs.Empty); // Initial check
+
         _timer = new DispatcherTimer();
         _timer.Interval = TimeSpan.FromMilliseconds(500); // Check every 500ms
         _timer.Tick += Timer_Tick;
@@ -52,10 +55,24 @@ public class FocusPullerService
     {
         UnregisterHotKey();
 
-        _isEnabled = false;
+        if (_targetWindowHandle != IntPtr.Zero)
+        {
+            TargetWindowClosed?.Invoke(this, EventArgs.Empty);
+        }
+
         _targetWindowHandle = IntPtr.Zero;
         _timer?.Stop();
         _timer = null;
+    }
+
+    public void BeginRefocusing()
+    {
+        _refocusing = true;
+    }
+
+    public void EndRefocusing()
+    {
+        _refocusing = false;
     }
 
     public void UpdateDelay(int refocusDelayInMilliseconds)
@@ -106,18 +123,14 @@ public class FocusPullerService
 
     private void Timer_Tick(object sender, EventArgs e)
     {
-        if (!_isEnabled)
-        {
-            return;
-        }
-
         // If we don't have a handle try to find the right window
         if (_targetWindowHandle == IntPtr.Zero)
         {
-            var targetWindow = _windowFinder.FindTargetWindow(); // finds an open target based on the rules
-            if (targetWindow != null)
+            _targetWindow = _windowFinder.FindTargetWindow(); // finds an open target based on the rules
+            if (_targetWindow != null)
             {
-                _targetWindowHandle = targetWindow.Handle;
+                _targetWindowHandle = _targetWindow.Handle;
+                TargetWindowCreated?.Invoke(this, _targetWindow);
             }
             else
             {
@@ -128,46 +141,50 @@ public class FocusPullerService
         // Check if target window still exists
         if (!Native.IsWindow(_targetWindowHandle))
         {
+            _targetWindow = null;
+            _targetWindowHandle = IntPtr.Zero;
             TargetWindowClosed?.Invoke(this, EventArgs.Empty);
-            Stop();
             return;
         }
 
-        var foregroundWindow = Native.GetForegroundWindow();
-        if (foregroundWindow != _targetWindowHandle)
+        if (_refocusing)
         {
-            // Target window lost focus
-            if (!_focusLost)
+            var foregroundWindow = Native.GetForegroundWindow();
+            if (foregroundWindow != _targetWindowHandle)
             {
-                _focusLost = true;
-                _lastFocusLostTime = DateTime.UtcNow;
+                // Target window lost focus
+                if (!_focusLost)
+                {
+                    _focusLost = true;
+                    _lastFocusLostTime = DateTime.UtcNow;
+                }
+                else
+                {
+                    // Check if enough time has passed and user is idle
+                    var timeSinceFocusLost = (DateTime.UtcNow - _lastFocusLostTime).TotalMilliseconds;
+                    var idleTime = GetIdleTime();
+
+                    if (timeSinceFocusLost >= _refocusDelayInMilliseconds && idleTime >= _refocusDelayInMilliseconds)
+                    {
+                        // we will trigger the hotkey - this will then send back the WM_HOTKEY message which is picked up by the main window and
+                        // sent back to us via NotifyHotKeyPressed, which then triggers the BringTargetToForeground method
+                        // this gets around the focus-stealing measures in Windows (for now)
+                        TriggerHotkey();
+                        _focusLost = false;
+                    }
+                }
             }
             else
             {
-                // Check if enough time has passed and user is idle
-                var timeSinceFocusLost = (DateTime.UtcNow - _lastFocusLostTime).TotalMilliseconds;
-                var idleTime = GetIdleTime();
-
-                if (timeSinceFocusLost >= _refocusDelayInMilliseconds && idleTime >= _refocusDelayInMilliseconds)
-                {
-                    // we will trigger the hotkey - this will then send back the WM_HOTKEY message which is picked up by the main window and
-                    // sent back to us via NotifyHotKeyPressed, which then triggers the BringTargetToForeground method
-                    // this gets around the focus-stealing measures in Windows (for now)
-                    TriggerHotkey();
-                    _focusLost = false;
-                }
+                // Target window has focus
+                _focusLost = false;
             }
-        }
-        else
-        {
-            // Target window has focus
-            _focusLost = false;
         }
     }
 
     private void BringTargetToForeground()
     {
-        if (_isEnabled && _targetWindowHandle != IntPtr.Zero)
+        if (_refocusing && _targetWindowHandle != IntPtr.Zero)
         {
             try
             {
